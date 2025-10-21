@@ -130,6 +130,24 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
     }
   };
 
+  const handleClearAllTeams = async () => {
+    if (teams.length === 0) {
+      alert('No teams to delete.');
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete all ${teams.length} team(s)? This action cannot be undone.`)) {
+      try {
+        await eventService.deleteAllTeams(eventId);
+        onTeamsChange([]);
+        alert('All teams have been deleted successfully.');
+      } catch (error) {
+        console.error('Error deleting all teams:', error);
+        alert('Failed to delete all teams. Please try again.');
+      }
+    }
+  };
+
   const handleExportPDF = () => {
     if (!window.jspdf) {
         alert("PDF generation library is not loaded.");
@@ -384,6 +402,29 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
           }}
         >
           Export CSV
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<DeleteIcon />}
+          onClick={handleClearAllTeams}
+          disabled={teams.length === 0}
+          sx={{
+            borderColor: '#ef4444',
+            color: '#ef4444',
+            '&:hover': {
+              backgroundColor: '#fef2f2',
+              borderColor: '#dc2626'
+            },
+            '&:disabled': {
+              borderColor: '#d1d5db',
+              color: '#9ca3af',
+            },
+            borderRadius: '8px',
+            textTransform: 'none',
+            fontWeight: 600,
+          }}
+        >
+          Clear All
         </Button>
       </Box>
 

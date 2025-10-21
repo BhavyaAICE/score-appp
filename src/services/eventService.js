@@ -154,6 +154,15 @@ export const eventService = {
     if (error) throw error;
   },
 
+  async deleteAllTeams(eventId) {
+    const { error } = await supabase
+      .from('teams')
+      .delete()
+      .eq('event_id', eventId);
+
+    if (error) throw error;
+  },
+
   // Criteria
   async getCriteriaByEvent(eventId) {
     const { data, error } = await supabase
