@@ -19,6 +19,7 @@ import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
+import LeaderboardIcon from '@mui/icons-material/Leaderboard';
 
 import Navigation from "../components/Navigation";
 import { eventService } from "../services/eventService";
@@ -436,6 +437,29 @@ function ManageEvent() {
                   </Button>
                   <Button
                     variant="contained"
+                    onClick={() => navigate(`/admin/event/${eventId}/leaderboard`)}
+                    startIcon={<LeaderboardIcon />}
+                    sx={{
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      textTransform: "none",
+                      px: 3,
+                      py: 1.5,
+                      fontSize: "0.95rem",
+                      fontWeight: 600,
+                      borderRadius: "14px",
+                      boxShadow: "0 4px 14px rgba(245, 158, 11, 0.25)",
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                      "&:hover": {
+                        background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+                        boxShadow: "0 8px 25px rgba(245, 158, 11, 0.35)",
+                        transform: 'translateY(-3px)'
+                      }
+                    }}
+                  >
+                    Live Leaderboard
+                  </Button>
+                  <Button
+                    variant="contained"
                     onClick={() => setCurrentTab(2)}
                     startIcon={<GavelOutlinedIcon />}
                     sx={{
@@ -502,7 +526,7 @@ function ManageEvent() {
                   eventName={event.name}
                 />
               )}
-              {currentTab === 3 && <RoundsTab rounds={rounds} onRoundsChange={handleRoundsChange} eventId={eventId} />}
+              {currentTab === 3 && <RoundsTab rounds={rounds} onRoundsChange={handleRoundsChange} eventId={eventId} judges={judges} teams={teams} />}
               {currentTab === 4 && <VenuesTab venues={venues} onVenuesChange={handleVenuesChange} eventId={eventId} />}
               {currentTab === 5 && <CriteriaTab categories={criteria} onCategoriesChange={handleCriteriaChange} eventId={eventId} />}
             </TabContent>

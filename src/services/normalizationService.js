@@ -99,11 +99,11 @@ function computeMAD(values, median) {
 export function computePerJudgeNormalization(evaluations, method = NormalizationMethods.Z_SCORE) {
   const judgeGroups = {};
 
-  evaluations.forEach(eval => {
-    if (!judgeGroups[eval.judge_id]) {
-      judgeGroups[eval.judge_id] = [];
+  evaluations.forEach(evalItem => {
+    if (!judgeGroups[evalItem.judge_id]) {
+      judgeGroups[evalItem.judge_id] = [];
     }
-    judgeGroups[eval.judge_id].push(eval);
+    judgeGroups[evalItem.judge_id].push(evalItem);
   });
 
   const results = [];
@@ -112,9 +112,9 @@ export function computePerJudgeNormalization(evaluations, method = Normalization
     const rawTotals = judgeEvals.map(e => e.raw_total);
 
     if (rawTotals.length < 2) {
-      judgeEvals.forEach(eval => {
+      judgeEvals.forEach(evalItem => {
         results.push({
-          ...eval,
+          ...evalItem,
           judge_mean: rawTotals[0] || 0,
           judge_std: 0,
           z_score: 0
@@ -128,9 +128,9 @@ export function computePerJudgeNormalization(evaluations, method = Normalization
       const mad = computeMAD(rawTotals, median);
 
       if (mad === 0) {
-        judgeEvals.forEach(eval => {
+        judgeEvals.forEach(evalItem => {
           results.push({
-            ...eval,
+            ...evalItem,
             judge_mean: median,
             judge_std: 0,
             z_score: 0
@@ -138,10 +138,10 @@ export function computePerJudgeNormalization(evaluations, method = Normalization
         });
       } else {
         const madScaleFactor = 1.4826;
-        judgeEvals.forEach(eval => {
-          const zScore = (eval.raw_total - median) / (madScaleFactor * mad);
+        judgeEvals.forEach(evalItem => {
+          const zScore = (evalItem.raw_total - median) / (madScaleFactor * mad);
           results.push({
-            ...eval,
+            ...evalItem,
             judge_mean: median,
             judge_std: mad * madScaleFactor,
             z_score: zScore
@@ -153,19 +153,19 @@ export function computePerJudgeNormalization(evaluations, method = Normalization
       const stdDev = computeStdDev(rawTotals, mean);
 
       if (stdDev === 0) {
-        judgeEvals.forEach(eval => {
+        judgeEvals.forEach(evalItem => {
           results.push({
-            ...eval,
+            ...evalItem,
             judge_mean: mean,
             judge_std: 0,
             z_score: 0
           });
         });
       } else {
-        judgeEvals.forEach(eval => {
-          const zScore = (eval.raw_total - mean) / stdDev;
+        judgeEvals.forEach(evalItem => {
+          const zScore = (evalItem.raw_total - mean) / stdDev;
           results.push({
-            ...eval,
+            ...evalItem,
             judge_mean: mean,
             judge_std: stdDev,
             z_score: zScore

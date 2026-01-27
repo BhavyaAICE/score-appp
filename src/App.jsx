@@ -1,13 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { AppProvider, useApp } from "./context/AppContext.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import LandingPage from "./pages/LandingPage.jsx";
 import HowItWorksPage from "./pages/HowItWorksPage.jsx";
 import FeaturesPage from "./pages/FeaturesPage.jsx";
 import AlgorithmPage from "./pages/AlgorithmPage.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
-import AdminDashboard from "./pages/AdminDashboard.jsx";
 import CategoryManager from "./pages/CategoryManager.jsx";
 import JudgeInterface from "./pages/JudgeInterface.jsx";
 import ResultsPage from "./pages/ResultsPage.jsx";
@@ -22,6 +22,9 @@ import DataRetention from "./pages/DataRetention.jsx";
 import Unauthorized from "./pages/Unauthorized.jsx";
 import UserManagement from "./pages/UserManagement.jsx";
 import TransparencyDashboard from "./pages/TransparencyDashboard.jsx";
+import AcceptInvitation from "./pages/AcceptInvitation.jsx";
+import SharedEventsPage from "./pages/SharedEventsPage.jsx";
+import LiveLeaderboardPage from "./pages/LiveLeaderboardPage.jsx";
 import SkipLink from "./components/SkipLink.jsx";
 import { Box, Typography, Button, CircularProgress, Alert } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -87,10 +90,8 @@ function LoadingScreen({ error, onRetry }) {
 function AppContent() {
   const { user, loading, authError, retry } = useApp();
 
-  if (loading) {
-    return <LoadingScreen error={authError} onRetry={retry} />;
-  }
-
+  // Only show loading screen if there's an error AND we're not loading
+  // This prevents blocking public pages during normal auth checks
   if (authError && !loading) {
     return <LoadingScreen error={authError} onRetry={retry} />;
   }
@@ -113,6 +114,17 @@ function AppContent() {
         
         {/* Unauthorized page */}
         <Route path="/unauthorized" element={<Unauthorized />} />
+        
+        {/* Invitation routes */}
+        <Route path="/accept-invitation" element={<AcceptInvitation />} />
+        <Route
+          path="/shared-events"
+          element={
+            <PrivateRoute>
+              <SharedEventsPage />
+            </PrivateRoute>
+          }
+        />
 
         {/* Auth routes */}
         <Route
@@ -129,7 +141,7 @@ function AppContent() {
           path="/admin"
           element={
             <PrivateRoute role="admin">
-              <AdminDashboard />
+              <Navigate to="/admin/events" replace />
             </PrivateRoute>
           }
         />
@@ -181,6 +193,14 @@ function AppContent() {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/admin/event/:eventId/leaderboard"
+          element={
+            <PrivateRoute role="admin">
+              <LiveLeaderboardPage />
+            </PrivateRoute>
+          }
+        />
 
         <Route path="/judge-dashboard" element={<JudgeDashboard />} />
 
@@ -214,11 +234,13 @@ function AppContent() {
 
 function App() {
   return (
-    <AppProvider>
-      <ThemeProvider>
-        <AppContent />
-      </ThemeProvider>
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
 

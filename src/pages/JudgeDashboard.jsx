@@ -16,23 +16,37 @@ import {
   Chip,
   Alert,
   CircularProgress,
+  LinearProgress,
+  Stepper,
+  Step,
+  StepLabel,
+  StepContent,
 } from '@mui/material';
-import { AssignmentInd, CheckCircle, HourglassEmpty } from '@mui/icons-material';
+import { 
+  AssignmentInd, 
+  CheckCircle, 
+  HourglassEmpty,
+  Lock as LockIcon,
+  PlayArrow as PlayArrowIcon,
+} from '@mui/icons-material';
 import { eventService } from '../services/eventService';
+import { roundService } from '../services/roundService';
 
 function JudgeDashboard() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
 
   const [judge, setJudge] = useState(null);
+  const [rounds, setRounds] = useState([]);
+  const [currentRound, setCurrentRound] = useState(null);
   const [assignedTeams, setAssignedTeams] = useState([]);
   const [criteria, setCriteria] = useState([]);
-  const [currentRound] = useState(1);
   const [scores, setScores] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submittedTeams, setSubmittedTeams] = useState(new Set());
   const [absentTeams, setAbsentTeams] = useState(new Set());
+  const [roundProgress, setRoundProgress] = useState({});
 
   useEffect(() => {
     if (!token) {
@@ -47,62 +61,40 @@ function JudgeDashboard() {
 
   const loadJudgeData = async () => {
     try {
-      console.log('Looking for token:', token);
-
+      // Find judge by token
       const foundJudge = await eventService.getJudgeByToken(token);
 
       if (!foundJudge) {
-        setError(`Invalid access token. Please check your invitation link. Token received: ${token}`);
+        setError(`Invalid access token. Please check your invitation link.`);
         setLoading(false);
         return;
       }
 
-      console.log('Found judge:', foundJudge);
       setJudge(foundJudge);
 
-      const assignedTeamIds = await eventService.getJudgeAssignments(foundJudge.id);
-      console.log('Assigned team IDs:', assignedTeamIds);
+      // Get all rounds this judge is assigned to with progress
+      const judgeRounds = await roundService.getJudgeRoundsWithProgress(foundJudge.id);
+      setRounds(judgeRounds);
 
-      const eventTeams = await eventService.getTeamsByEvent(foundJudge.event_id);
-      console.log('Event teams:', eventTeams);
+      // Calculate progress for each round
+      const progressMap = {};
+      for (const round of judgeRounds) {
+        progressMap[round.id] = round.progress;
+      }
+      setRoundProgress(progressMap);
 
-      const assigned = eventTeams.filter(team => assignedTeamIds.includes(team.id));
-      console.log('Filtered assigned teams:', assigned);
-      setAssignedTeams(assigned);
+      // Find the active round (first incomplete round in sequence)
+      const activeRound = await roundService.getActiveRoundForJudge(foundJudge.id);
+      
+      if (activeRound) {
+        setCurrentRound(activeRound);
+        await loadRoundData(activeRound.id, foundJudge.id);
+      } else if (judgeRounds.length > 0) {
+        // Default to first round if no active round
+        setCurrentRound(judgeRounds[0]);
+        await loadRoundData(judgeRounds[0].id, foundJudge.id);
+      }
 
-      // Track absent teams
-      const absent = new Set(assigned.filter(team => team.is_absent).map(team => team.id));
-      setAbsentTeams(absent);
-
-      // Load criteria for the event
-      const eventCriteria = await eventService.getCriteriaByEvent(foundJudge.event_id);
-      console.log('Event criteria:', eventCriteria);
-      setCriteria(eventCriteria);
-
-      const existingScores = await eventService.getScoresByJudge(foundJudge.id);
-      console.log('Existing scores:', existingScores);
-
-      const scoresMap = {};
-      const submitted = new Set();
-
-      existingScores.forEach(score => {
-        if (!scoresMap[score.team_id]) {
-          scoresMap[score.team_id] = {};
-        }
-        scoresMap[score.team_id][score.criterion_key] = score.score;
-      });
-
-      // Check if all criteria are filled for each team
-      assigned.forEach(team => {
-        const teamScores = scoresMap[team.id] || {};
-        const allFilled = eventCriteria.every(c => teamScores[c.id] !== undefined && teamScores[c.id] !== '');
-        if (allFilled) {
-          submitted.add(team.id);
-        }
-      });
-
-      setScores(scoresMap);
-      setSubmittedTeams(submitted);
       setLoading(false);
     } catch (error) {
       console.error('Error loading judge data:', error);
@@ -111,22 +103,86 @@ function JudgeDashboard() {
     }
   };
 
+  const loadRoundData = async (roundId, judgeId) => {
+    try {
+      // Get teams assigned to this judge for this round
+      const teams = await roundService.getTeamsAssignedToJudgeForRound(roundId, judgeId);
+      setAssignedTeams(teams);
+
+      // Track absent teams
+      const absent = new Set(teams.filter(team => team.is_absent).map(team => team.id));
+      setAbsentTeams(absent);
+
+      // Get criteria for this round
+      const roundCriteria = await roundService.getRoundCriteria(roundId);
+      setCriteria(roundCriteria);
+
+      // Get existing evaluations for this round
+      const evaluations = await roundService.getJudgeEvaluationsForRound(roundId, judgeId);
+
+      const scoresMap = {};
+      const submitted = new Set();
+
+      evaluations.forEach(evaluation => {
+        scoresMap[evaluation.team_id] = evaluation.scores || {};
+        if (!evaluation.is_draft) {
+          submitted.add(evaluation.team_id);
+        }
+      });
+
+      setScores(scoresMap);
+      setSubmittedTeams(submitted);
+    } catch (error) {
+      console.error('Error loading round data:', error);
+      setError(`Failed to load round data: ${error.message}`);
+    }
+  };
+
+  const handleRoundSelect = async (round) => {
+    // Check if previous rounds are complete (sequential flow)
+    const roundIndex = rounds.findIndex(r => r.id === round.id);
+    for (let i = 0; i < roundIndex; i++) {
+      const prevRound = rounds[i];
+      if (!roundProgress[prevRound.id]?.isComplete) {
+        alert(`Please complete ${prevRound.name} before accessing ${round.name}`);
+        return;
+      }
+    }
+
+    // Check if round is active
+    if (round.status === 'draft') {
+      alert('This round has not started yet. Please wait for the admin to activate it.');
+      return;
+    }
+
+    if (round.status === 'closed' || round.status === 'completed') {
+      // Allow viewing but not editing
+    }
+
+    setCurrentRound(round);
+    setLoading(true);
+    await loadRoundData(round.id, judge.id);
+    setLoading(false);
+  };
+
   const handleScoreChange = (teamId, criterionId, value, maxScore) => {
     const numValue = parseFloat(value);
-    if (isNaN(numValue) || numValue < 0 || numValue > maxScore) return;
+    if (value !== '' && (isNaN(numValue) || numValue < 0 || numValue > maxScore)) return;
 
     setScores(prev => ({
       ...prev,
       [teamId]: {
         ...prev[teamId],
-        [criterionId]: numValue
+        [criterionId]: value === '' ? '' : numValue
       }
     }));
   };
 
   const handleSubmitScores = async (teamId) => {
     const teamScores = scores[teamId] || {};
-    const allFilled = criteria.every(c => teamScores[c.id] !== undefined && teamScores[c.id] !== '');
+    const allFilled = criteria.every(c => 
+      teamScores[c.id] !== undefined && teamScores[c.id] !== ''
+    );
 
     if (!allFilled) {
       alert('Please fill in all criteria scores before submitting.');
@@ -134,19 +190,23 @@ function JudgeDashboard() {
     }
 
     try {
-      for (const criterion of criteria) {
-        await eventService.upsertScore({
-          judge_id: judge.id,
-          team_id: teamId,
-          criterion_key: criterion.id,
-          score: teamScores[criterion.id],
-          round: currentRound
-        });
-      }
+      await roundService.submitRoundEvaluation(
+        currentRound.id,
+        judge.id,
+        teamId,
+        teamScores
+      );
 
       const newSubmitted = new Set(submittedTeams);
       newSubmitted.add(teamId);
       setSubmittedTeams(newSubmitted);
+
+      // Update round progress
+      const progress = await roundService.getJudgeRoundProgress(currentRound.id, judge.id);
+      setRoundProgress(prev => ({
+        ...prev,
+        [currentRound.id]: progress
+      }));
 
       alert('Scores submitted successfully!');
     } catch (error) {
@@ -155,14 +215,21 @@ function JudgeDashboard() {
     }
   };
 
-  const handlePushToAdmin = () => {
-    const teamsToScore = assignedTeams.filter(team => !absentTeams.has(team.id));
-    if (submittedTeams.size !== teamsToScore.length) {
-      alert('Please score all assigned teams (excluding absent teams) before pushing to admin.');
-      return;
-    }
+  const handleSaveDraft = async (teamId) => {
+    const teamScores = scores[teamId] || {};
 
-    alert('All scores are automatically synced to the admin dashboard!');
+    try {
+      await roundService.saveDraftEvaluation(
+        currentRound.id,
+        judge.id,
+        teamId,
+        teamScores
+      );
+      alert('Draft saved successfully!');
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      alert('Failed to save draft. Please try again.');
+    }
   };
 
   const handleMarkAbsent = async (teamId) => {
@@ -175,7 +242,6 @@ function JudgeDashboard() {
         newAbsentTeams.delete(teamId);
       } else {
         newAbsentTeams.add(teamId);
-        // Remove from submitted if marking as absent
         const newSubmittedTeams = new Set(submittedTeams);
         newSubmittedTeams.delete(teamId);
         setSubmittedTeams(newSubmittedTeams);
@@ -186,31 +252,6 @@ function JudgeDashboard() {
     } catch (error) {
       console.error('Error marking team absent:', error);
       alert('Failed to update team status. Please try again.');
-    }
-  };
-
-  const handleRemoveTeam = async (teamId) => {
-    if (!window.confirm('Are you sure you want to remove this team from your assignments?')) {
-      return;
-    }
-
-    try {
-      await eventService.removeJudgeTeamAssignment(judge.id, teamId);
-      setAssignedTeams(assignedTeams.filter(team => team.id !== teamId));
-
-      // Clean up state
-      const newSubmittedTeams = new Set(submittedTeams);
-      newSubmittedTeams.delete(teamId);
-      setSubmittedTeams(newSubmittedTeams);
-
-      const newAbsentTeams = new Set(absentTeams);
-      newAbsentTeams.delete(teamId);
-      setAbsentTeams(newAbsentTeams);
-
-      alert('Team removed from your assignments successfully.');
-    } catch (error) {
-      console.error('Error removing team:', error);
-      alert('Failed to remove team. Please try again.');
     }
   };
 
@@ -227,45 +268,22 @@ function JudgeDashboard() {
       <Box sx={{ minHeight: '100vh', background: '#f5f7fa', p: 4 }}>
         <Box sx={{ maxWidth: '800px', mx: 'auto' }}>
           <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>
-
-          <Card sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Debug Information</Typography>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>Token from URL:</Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={token || 'No token provided'}
-                InputProps={{ readOnly: true }}
-                sx={{ mb: 2 }}
-              />
-            </Box>
-            <Button
-              variant="contained"
-              onClick={() => {
-                console.log('Manual debug triggered');
-                console.log('Token:', token);
-                const allKeys = Object.keys(localStorage).filter(k => k.startsWith('judges_'));
-                console.log('Judge keys in localStorage:', allKeys);
-                allKeys.forEach(key => {
-                  const data = JSON.parse(localStorage.getItem(key) || '[]');
-                  console.log(`${key}:`, data);
-                });
-              }}
-            >
-              Log Debug Info to Console
-            </Button>
-          </Card>
         </Box>
       </Box>
     );
   }
 
-  // Criteria are now loaded from database in loadJudgeData()
+  const teamsToScore = assignedTeams.filter(team => !absentTeams.has(team.id));
+  const progressPercent = teamsToScore.length > 0 
+    ? (submittedTeams.size / teamsToScore.length) * 100 
+    : 0;
+
+  const isRoundEditable = currentRound?.status === 'active';
 
   return (
     <Box sx={{ minHeight: '100vh', background: '#f5f7fa', p: 4 }}>
       <Box sx={{ maxWidth: '1200px', mx: 'auto' }}>
+        {/* Header */}
         <Card sx={{ p: 4, mb: 4, borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <AssignmentInd sx={{ fontSize: 40, color: '#2563eb', mr: 2 }} />
@@ -279,34 +297,137 @@ function JudgeDashboard() {
             </Box>
           </Box>
 
-          <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-            <Chip
-              label={`Round ${currentRound}`}
-              color="primary"
-              sx={{ fontWeight: 600 }}
-            />
-            <Chip
-              label={`${assignedTeams.length} Teams Assigned`}
-              variant="outlined"
-              sx={{ fontWeight: 600 }}
-            />
-            <Chip
-              label={`${submittedTeams.size}/${assignedTeams.filter(t => !absentTeams.has(t.id)).length} Scored`}
-              color={submittedTeams.size === assignedTeams.filter(t => !absentTeams.has(t.id)).length ? 'success' : 'warning'}
-              sx={{ fontWeight: 600 }}
-            />
-            {absentTeams.size > 0 && (
+          {/* Round Progress Stepper */}
+          {rounds.length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#64748b' }}>
+                ROUND PROGRESS (Sequential)
+              </Typography>
+              <Stepper activeStep={rounds.findIndex(r => r.id === currentRound?.id)} alternativeLabel>
+                {rounds.map((round, index) => {
+                  const progress = roundProgress[round.id];
+                  const isComplete = progress?.isComplete;
+                  const isPreviousComplete = index === 0 || roundProgress[rounds[index - 1]?.id]?.isComplete;
+                  const isAccessible = isPreviousComplete && round.status !== 'draft';
+                  
+                  return (
+                    <Step 
+                      key={round.id} 
+                      completed={isComplete}
+                      sx={{ cursor: isAccessible ? 'pointer' : 'not-allowed' }}
+                      onClick={() => isAccessible && handleRoundSelect(round)}
+                    >
+                      <StepLabel
+                        error={!isPreviousComplete && !isComplete}
+                        icon={
+                          round.status === 'draft' ? <LockIcon /> :
+                          isComplete ? <CheckCircle sx={{ color: '#10b981' }} /> :
+                          round.id === currentRound?.id ? <PlayArrowIcon sx={{ color: '#3b82f6' }} /> :
+                          undefined
+                        }
+                      >
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {round.name}
+                          </Typography>
+                          {progress && (
+                            <Typography variant="caption" color="textSecondary">
+                              {progress.submitted}/{progress.total} teams
+                            </Typography>
+                          )}
+                        </Box>
+                      </StepLabel>
+                    </Step>
+                  );
+                })}
+              </Stepper>
+            </Box>
+          )}
+
+          {/* Current Round Stats */}
+          {currentRound && (
+            <Box sx={{ display: 'flex', gap: 2, mt: 3, flexWrap: 'wrap' }}>
               <Chip
-                label={`${absentTeams.size} Absent`}
-                color="error"
+                label={currentRound.name}
+                color="primary"
                 sx={{ fontWeight: 600 }}
               />
-            )}
-          </Box>
+              <Chip
+                label={currentRound.status === 'active' ? 'Open for Judging' : 
+                       currentRound.status === 'draft' ? 'Not Started' : 'Closed'}
+                color={currentRound.status === 'active' ? 'success' : 
+                       currentRound.status === 'draft' ? 'default' : 'warning'}
+                sx={{ fontWeight: 600 }}
+              />
+              <Chip
+                label={`${assignedTeams.length} Teams Assigned`}
+                variant="outlined"
+                sx={{ fontWeight: 600 }}
+              />
+              <Chip
+                label={`${submittedTeams.size}/${teamsToScore.length} Scored`}
+                color={submittedTeams.size === teamsToScore.length ? 'success' : 'warning'}
+                sx={{ fontWeight: 600 }}
+              />
+              {absentTeams.size > 0 && (
+                <Chip
+                  label={`${absentTeams.size} Absent`}
+                  color="error"
+                  sx={{ fontWeight: 600 }}
+                />
+              )}
+            </Box>
+          )}
+
+          {/* Progress Bar */}
+          {teamsToScore.length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="body2" color="textSecondary">
+                  Round Progress
+                </Typography>
+                <Typography variant="body2" fontWeight={600}>
+                  {Math.round(progressPercent)}%
+                </Typography>
+              </Box>
+              <LinearProgress 
+                variant="determinate" 
+                value={progressPercent} 
+                sx={{ 
+                  height: 8, 
+                  borderRadius: 4,
+                  backgroundColor: '#e2e8f0',
+                  '& .MuiLinearProgress-bar': {
+                    borderRadius: 4,
+                    background: progressPercent === 100 
+                      ? 'linear-gradient(90deg, #10b981, #059669)' 
+                      : 'linear-gradient(90deg, #3b82f6, #2563eb)'
+                  }
+                }}
+              />
+            </Box>
+          )}
         </Card>
 
+        {/* No Round Warning */}
+        {!currentRound && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            No rounds have been assigned to you yet. Please wait for the event administrator to set up rounds and assign you.
+          </Alert>
+        )}
+
+        {/* Round Not Active Warning */}
+        {currentRound && !isRoundEditable && (
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            {currentRound.status === 'draft' 
+              ? 'This round has not started yet. Please wait for the admin to activate it.'
+              : 'This round is closed. You can view your scores but cannot make changes.'}
+          </Alert>
+        )}
+
+        {/* Teams List */}
         {assignedTeams.length === 0 ? (
-          <Alert severity="info">No teams have been assigned to you yet.</Alert>
+          <Alert severity="info">No teams have been assigned to you for this round.</Alert>
         ) : (
           <Box>
             {assignedTeams.map((team) => {
@@ -342,67 +463,39 @@ function JudgeDashboard() {
                       </Box>
                       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                         {isAbsent ? (
-                          <Chip
-                            label="Absent"
-                            color="error"
-                            sx={{ fontWeight: 600 }}
-                          />
+                          <Chip label="Absent" color="error" sx={{ fontWeight: 600 }} />
                         ) : isSubmitted ? (
-                          <Chip
-                            icon={<CheckCircle />}
-                            label="Submitted"
-                            color="success"
-                            sx={{ fontWeight: 600 }}
-                          />
+                          <Chip icon={<CheckCircle />} label="Submitted" color="success" sx={{ fontWeight: 600 }} />
                         ) : (
-                          <Chip
-                            icon={<HourglassEmpty />}
-                            label="Pending"
-                            color="warning"
-                            sx={{ fontWeight: 600 }}
-                          />
+                          <Chip icon={<HourglassEmpty />} label="Pending" color="warning" sx={{ fontWeight: 600 }} />
                         )}
                       </Box>
                     </Box>
 
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                      <Button
-                        variant={isAbsent ? "contained" : "outlined"}
-                        size="small"
-                        onClick={() => handleMarkAbsent(team.id)}
-                        sx={{
-                          textTransform: 'none',
-                          fontWeight: 600,
-                          borderRadius: '8px',
-                          ...(isAbsent ? {
-                            background: '#10b981',
-                            '&:hover': { background: '#059669' }
-                          } : {
-                            borderColor: '#ef4444',
-                            color: '#ef4444',
-                            '&:hover': {
-                              borderColor: '#dc2626',
-                              background: '#fef2f2'
-                            }
-                          })
-                        }}
-                      >
-                        {isAbsent ? 'Mark Present' : 'Mark Absent'}
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        color="error"
-                        onClick={() => handleRemoveTeam(team.id)}
-                        sx={{
-                          textTransform: 'none',
-                          fontWeight: 600,
-                          borderRadius: '8px'
-                        }}
-                      >
-                        Remove Team
-                      </Button>
-                    </Box>
+                    {isRoundEditable && (
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Button
+                          variant={isAbsent ? "contained" : "outlined"}
+                          size="small"
+                          onClick={() => handleMarkAbsent(team.id)}
+                          sx={{
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            borderRadius: '8px',
+                            ...(isAbsent ? {
+                              background: '#10b981',
+                              '&:hover': { background: '#059669' }
+                            } : {
+                              borderColor: '#ef4444',
+                              color: '#ef4444',
+                              '&:hover': { borderColor: '#dc2626', background: '#fef2f2' }
+                            })
+                          }}
+                        >
+                          {isAbsent ? 'Mark Present' : 'Mark Absent'}
+                        </Button>
+                      </Box>
+                    )}
                   </Box>
 
                   {!isAbsent && (
@@ -421,101 +514,110 @@ function JudgeDashboard() {
                             {criteria.map((criterion) => (
                               <TableRow
                                 key={criterion.id}
-                                sx={{
-                                  '&:hover': {
-                                    backgroundColor: '#f8fafc'
-                                  }
-                                }}
+                                sx={{ '&:hover': { backgroundColor: '#f8fafc' } }}
                               >
-                                <TableCell sx={{ fontWeight: 600, color: '#334155' }}>{criterion.name}</TableCell>
-                                <TableCell sx={{ color: '#64748b', fontWeight: 500 }}>{criterion.max_score}</TableCell>
+                                <TableCell>
+                                  <Typography sx={{ fontWeight: 600, color: '#334155' }}>
+                                    {criterion.name}
+                                  </Typography>
+                                  {criterion.description && (
+                                    <Typography variant="caption" color="textSecondary">
+                                      {criterion.description}
+                                    </Typography>
+                                  )}
+                                </TableCell>
+                                <TableCell sx={{ color: '#64748b', fontWeight: 500 }}>
+                                  {criterion.max_marks}
+                                </TableCell>
                                 <TableCell>
                                   <TextField
                                     type="number"
                                     size="small"
-                                    value={teamScores[criterion.id] || ''}
-                                    onChange={(e) => handleScoreChange(team.id, criterion.id, e.target.value, criterion.max_score)}
-                                    disabled={isSubmitted}
-                                    inputProps={{ min: 0, max: criterion.max_score, step: 0.1 }}
-                                    sx={{
-                                      width: '140px',
-                                      '& .MuiOutlinedInput-root': {
-                                        '&.Mui-focused fieldset': {
-                                          borderColor: '#2563eb'
-                                        }
-                                      }
+                                    value={teamScores[criterion.id] ?? ''}
+                                    onChange={(e) => handleScoreChange(
+                                      team.id, 
+                                      criterion.id, 
+                                      e.target.value, 
+                                      criterion.max_marks
+                                    )}
+                                    disabled={isSubmitted || !isRoundEditable}
+                                    inputProps={{ 
+                                      min: 0, 
+                                      max: criterion.max_marks, 
+                                      step: 0.5 
                                     }}
-                                    placeholder={`0-${criterion.max_score}`}
+                                    sx={{ width: '140px' }}
+                                    placeholder={`0-${criterion.max_marks}`}
                                   />
                                 </TableCell>
-                                <TableCell sx={{ color: '#64748b', fontWeight: 600 }}>{criterion.weight}x</TableCell>
+                                <TableCell sx={{ color: '#64748b', fontWeight: 600 }}>
+                                  {criterion.weight}x
+                                </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
                       </TableContainer>
 
-                      <Box sx={{ p: 3, display: 'flex', justifyContent: 'flex-end', background: '#fafafa' }}>
-                        <Button
-                          variant="contained"
-                          onClick={() => handleSubmitScores(team.id)}
-                          disabled={isSubmitted}
-                          sx={{
-                            background: isSubmitted
-                              ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
-                              : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                            px: 4,
-                            py: 1.2,
-                            fontWeight: 700,
-                            borderRadius: '10px',
-                            textTransform: 'none',
-                            boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              background: isSubmitted
-                                ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
-                                : 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
-                              transform: isSubmitted ? 'none' : 'translateY(-2px)',
-                              boxShadow: isSubmitted ? '0 2px 8px rgba(37, 99, 235, 0.25)' : '0 4px 12px rgba(37, 99, 235, 0.35)'
-                            }
-                          }}
-                        >
-                          {isSubmitted ? 'Scores Submitted' : 'Submit Scores'}
-                        </Button>
+                      <Box sx={{ p: 3, display: 'flex', justifyContent: 'flex-end', gap: 2, background: '#fafafa' }}>
+                        {isRoundEditable && !isSubmitted && (
+                          <>
+                            <Button
+                              variant="outlined"
+                              onClick={() => handleSaveDraft(team.id)}
+                              sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}
+                            >
+                              Save Draft
+                            </Button>
+                            <Button
+                              variant="contained"
+                              onClick={() => handleSubmitScores(team.id)}
+                              sx={{
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                textTransform: 'none',
+                                fontWeight: 700,
+                                borderRadius: '8px',
+                                '&:hover': {
+                                  background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                                }
+                              }}
+                            >
+                              Submit Scores
+                            </Button>
+                          </>
+                        )}
+                        {isSubmitted && (
+                          <Typography color="success.main" sx={{ fontWeight: 600 }}>
+                            ✓ Evaluation submitted
+                          </Typography>
+                        )}
                       </Box>
                     </>
                   )}
                 </Card>
               );
             })}
-
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={handlePushToAdmin}
-                disabled={submittedTeams.size !== assignedTeams.filter(t => !absentTeams.has(t.id)).length}
-                sx={{
-                  background: submittedTeams.size === assignedTeams.filter(t => !absentTeams.has(t.id)).length
-                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                    : '#9ca3af',
-                  px: 6,
-                  py: 1.5,
-                  fontSize: '1.1rem',
-                  fontWeight: 700,
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)',
-                  '&:hover': {
-                    background: submittedTeams.size === assignedTeams.filter(t => !absentTeams.has(t.id)).length
-                      ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
-                      : '#9ca3af',
-                  }
-                }}
-              >
-                Push All Scores to Admin Dashboard
-              </Button>
-            </Box>
           </Box>
+        )}
+
+        {/* All Complete Message */}
+        {submittedTeams.size === teamsToScore.length && teamsToScore.length > 0 && (
+          <Card sx={{ 
+            p: 4, 
+            textAlign: 'center', 
+            background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+            borderRadius: '16px'
+          }}>
+            <CheckCircle sx={{ fontSize: 48, color: '#10b981', mb: 2 }} />
+            <Typography variant="h5" sx={{ fontWeight: 700, color: '#065f46', mb: 1 }}>
+              Round Complete! 🎉
+            </Typography>
+            <Typography color="textSecondary">
+              {rounds.findIndex(r => r.id === currentRound?.id) < rounds.length - 1 
+                ? 'You can now proceed to the next round.'
+                : 'You have completed all your evaluations. Thank you!'}
+            </Typography>
+          </Card>
         )}
       </Box>
     </Box>

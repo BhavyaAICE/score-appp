@@ -13,6 +13,7 @@ import { supabase } from '../supabaseClient';
 
 export const Roles = {
   SUPER_ADMIN: 'super_admin',
+  CO_ADMIN: 'co_admin',
   EVENT_ADMIN: 'event_admin',
   JUDGE: 'judge',
   VIEWER: 'viewer'
@@ -73,13 +74,24 @@ export const rbacService = {
   },
 
   async createUserProfile(userId, email, fullName, role = Roles.VIEWER) {
+    // Check if profile already exists (may have been created by trigger)
+    const { data: existing } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (existing) {
+      // Profile already exists, just return it
+      return existing;
+    }
+
     const { data, error } = await supabase
       .from('user_profiles')
       .insert([{
         id: userId,
         email,
-        full_name: fullName,
-        role
+        full_name: fullName
       }])
       .select()
       .single();

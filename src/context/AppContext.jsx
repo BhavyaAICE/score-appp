@@ -30,18 +30,20 @@ export const AppProvider = ({ children }) => {
         setPermissions(rolePermissions);
 
         if (profile.organization_id) {
-          const { data: org } = await supabase
+          const { data: org, error: orgError } = await supabase
             .from('organizations')
             .select('*')
             .eq('id', profile.organization_id)
-            .single();
+            .maybeSingle();
+          if (orgError) console.warn('Error loading organization:', orgError);
           setOrganization(org);
 
-          const { data: brandingData } = await supabase
+          const { data: brandingData, error: brandingError } = await supabase
             .from('branding_settings')
             .select('*')
             .eq('organization_id', profile.organization_id)
-            .single();
+            .maybeSingle();
+          if (brandingError) console.warn('Error loading branding:', brandingError);
           setBranding(brandingData);
         }
       }
@@ -144,12 +146,23 @@ export const AppProvider = ({ children }) => {
     }
   }, [user, loadUserProfile]);
 
+  // Helper to clear timeout and finish loading successfully
+  const finishLoading = useCallback(() => {
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+    setLoading(false);
+    setAuthError(null); // Clear any pending error
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     
-    // Set up loading timeout
+    // Set up loading timeout - only as a fallback for stuck states
     loadingTimeoutRef.current = setTimeout(() => {
       if (isMounted && loading) {
+        console.warn('Auth loading timeout reached');
         setLoading(false);
         setAuthError('Loading took too long. Please try again.');
       }
@@ -169,7 +182,7 @@ export const AppProvider = ({ children }) => {
         setTimeout(() => {
           if (isMounted) {
             loadUserProfile(session.user.id).finally(() => {
-              if (isMounted) setLoading(false);
+              if (isMounted) finishLoading();
             });
           }
         }, 0);
@@ -180,7 +193,7 @@ export const AppProvider = ({ children }) => {
         setOrganization(null);
         setBranding(null);
         profileLoadedRef.current = false;
-        setLoading(false);
+        finishLoading();
       }
     });
 
@@ -198,18 +211,19 @@ export const AppProvider = ({ children }) => {
         setTimeout(() => {
           if (isMounted) {
             loadUserProfile(session.user.id).finally(() => {
-              if (isMounted) setLoading(false);
+              if (isMounted) finishLoading();
             });
           }
         }, 0);
       } else {
-        setLoading(false);
+        finishLoading();
       }
     }).catch((error) => {
       console.error('Session check error:', error);
       if (isMounted) {
-        setLoading(false);
-        setAuthError('Failed to check authentication status.');
+        // Don't show error for initial load - just finish loading
+        // The user can always login manually
+        finishLoading();
       }
     });
 
@@ -220,7 +234,7 @@ export const AppProvider = ({ children }) => {
       }
       subscription.unsubscribe();
     };
-  }, [loadUserProfile]);
+  }, [loadUserProfile, finishLoading]);
 
   const value = {
     user,

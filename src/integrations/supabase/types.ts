@@ -299,6 +299,61 @@ export type Database = {
           },
         ]
       }
+      event_access: {
+        Row: {
+          created_at: string
+          event_id: string
+          granted_by: string
+          id: string
+          invitation_id: string | null
+          organization_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          granted_by: string
+          id?: string
+          invitation_id?: string | null
+          organization_id: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          granted_by?: string
+          id?: string
+          invitation_id?: string | null
+          organization_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_access_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_access_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: false
+            referencedRelation: "invitations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_access_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_admin_assignments: {
         Row: {
           created_at: string | null
@@ -432,6 +487,7 @@ export type Database = {
           locked_at: string | null
           locked_by: string | null
           name: string
+          organization_id: string | null
           published_at: string | null
           published_by: string | null
           start_date: string | null
@@ -447,6 +503,7 @@ export type Database = {
           locked_at?: string | null
           locked_by?: string | null
           name: string
+          organization_id?: string | null
           published_at?: string | null
           published_by?: string | null
           start_date?: string | null
@@ -462,13 +519,81 @@ export type Database = {
           locked_at?: string | null
           locked_by?: string | null
           name?: string
+          organization_id?: string | null
           published_at?: string | null
           published_by?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["event_status"] | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          email: string
+          event_ids: string[] | null
+          expires_at: string
+          id: string
+          invited_by: string
+          message: string | null
+          organization_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email: string
+          event_ids?: string[] | null
+          expires_at?: string
+          id?: string
+          invited_by: string
+          message?: string | null
+          organization_id: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email?: string
+          event_ids?: string[] | null
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          message?: string | null
+          organization_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       judge_assignments: {
         Row: {
@@ -597,6 +722,7 @@ export type Database = {
           id: string
           is_enterprise: boolean | null
           name: string
+          owner_id: string | null
           slug: string
           updated_at: string | null
         }
@@ -607,6 +733,7 @@ export type Database = {
           id?: string
           is_enterprise?: boolean | null
           name: string
+          owner_id?: string | null
           slug: string
           updated_at?: string | null
         }
@@ -617,6 +744,7 @@ export type Database = {
           id?: string
           is_enterprise?: boolean | null
           name?: string
+          owner_id?: string | null
           slug?: string
           updated_at?: string | null
         }
@@ -1521,10 +1649,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: { Args: { p_token: string }; Returns: Json }
       can_access_event: {
         Args: { p_event_id: string; p_user_id: string }
         Returns: boolean
       }
+      can_access_organization: { Args: { p_org_id: string }; Returns: boolean }
       create_audit_log: {
         Args: {
           p_action: string
@@ -1537,10 +1667,36 @@ export type Database = {
         }
         Returns: string
       }
+      get_auth_email: { Args: never; Returns: string }
       get_event_state: { Args: { p_event_id: string }; Returns: Json }
+      get_role_permissions: {
+        Args: { p_role: Database["public"]["Enums"]["app_role"] }
+        Returns: Json
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      get_user_shared_events: {
+        Args: { p_user_id?: string }
+        Returns: {
+          event_id: string
+          event_name: string
+          granted_at: string
+          organization_name: string
+          role: Database["public"]["Enums"]["app_role"]
+          shared_by_email: string
+          shared_by_name: string
+        }[]
+      }
+      grant_event_access: {
+        Args: {
+          p_event_id: string
+          p_organization_id: string
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_email: string
+        }
+        Returns: Json
       }
       has_permission: {
         Args: { p_action: string; p_resource: string; p_user_id: string }
@@ -1557,6 +1713,7 @@ export type Database = {
         Args: { p_scores: Json }
         Returns: boolean
       }
+      revoke_event_access: { Args: { p_access_id: string }; Returns: Json }
       transition_event_status: {
         Args: { p_event_id: string; p_new_status: string; p_reason?: string }
         Returns: Json
@@ -1567,7 +1724,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "super_admin" | "event_admin" | "judge" | "viewer"
+      app_role: "super_admin" | "co_admin" | "event_admin" | "judge" | "viewer"
       event_status: "draft" | "live_judging" | "locked" | "published"
     }
     CompositeTypes: {
@@ -1696,7 +1853,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["super_admin", "event_admin", "judge", "viewer"],
+      app_role: ["super_admin", "co_admin", "event_admin", "judge", "viewer"],
       event_status: ["draft", "live_judging", "locked", "published"],
     },
   },
