@@ -344,9 +344,9 @@ export function computeRoundNormalization(evaluations, criteria, options = {}) {
   const method = options.method || NormalizationMethods.Z_SCORE;
   const judgeWeights = options.judgeWeights || {};
 
-  const evaluationsWithRawTotals = evaluations.map(eval => ({
+  const evaluationsWithRawTotals = evaluations.map(evaluation => ({
     ...eval,
-    raw_total: computeRawTotal(eval, criteria)
+    raw_total: computeRawTotal(evaluation, criteria)
   }));
 
   const perJudgeResults = computePerJudgeNormalization(evaluationsWithRawTotals, method);
@@ -361,3 +361,4 @@ export function computeRoundNormalization(evaluations, criteria, options = {}) {
     finalResults
   };
 }
+
