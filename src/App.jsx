@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { ThemeProvider } from "./context/ThemeContext.jsx";
+import { ThemeProvider as MuiThemeProvider } from "@mui/material/styles";
+import { ThemeProvider as AppThemeProvider } from "./context/ThemeContext.jsx";
+
 import { AppProvider, useApp } from "./context/AppContext.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import LandingPage from "./pages/LandingPage.jsx";
@@ -25,6 +27,9 @@ import TransparencyDashboard from "./pages/TransparencyDashboard.jsx";
 import AcceptInvitation from "./pages/AcceptInvitation.jsx";
 import SharedEventsPage from "./pages/SharedEventsPage.jsx";
 import LiveLeaderboardPage from "./pages/LiveLeaderboardPage.jsx";
+import ShowcasePage from "./pages/ShowcasePage.jsx";
+import UserProfile from "./pages/UserProfile.jsx";
+
 import SkipLink from "./components/SkipLink.jsx";
 import { Box, Typography, Button, CircularProgress, Alert } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -100,133 +105,143 @@ function AppContent() {
     <Router>
       <SkipLink targetId="main-content" />
       <main id="main-content" tabIndex="-1" style={{ outline: 'none' }}>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/how-it-works" element={<HowItWorksPage />} />
-        <Route path="/features" element={<FeaturesPage />} />
-        <Route path="/algorithm" element={<AlgorithmPage />} />
-        
-        {/* Legal pages */}
-        <Route path="/privacy" element={<PrivacyPolicy />} />
-        <Route path="/terms" element={<TermsOfUse />} />
-        <Route path="/data-retention" element={<DataRetention />} />
-        
-        {/* Unauthorized page */}
-        <Route path="/unauthorized" element={<Unauthorized />} />
-        
-        {/* Invitation routes */}
-        <Route path="/accept-invitation" element={<AcceptInvitation />} />
-        <Route
-          path="/shared-events"
-          element={
-            <PrivateRoute>
-              <SharedEventsPage />
-            </PrivateRoute>
-          }
-        />
+        <Routes>
+          {/* Public routes */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/how-it-works" element={<HowItWorksPage />} />
+          <Route path="/features" element={<FeaturesPage />} />
+          <Route path="/algorithm" element={<AlgorithmPage />} />
+          <Route path="/showcase" element={<ShowcasePage />} />
 
-        {/* Auth routes */}
-        <Route
-          path="/login"
-          element={user ? <Navigate to="/admin/events" /> : <Login />}
-        />
-        <Route
-          path="/register"
-          element={user ? <Navigate to="/admin/events" /> : <Register />}
-        />
+          {/* Legal pages */}
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfUse />} />
+          <Route path="/data-retention" element={<DataRetention />} />
 
-        {/* Admin routes */}
-        <Route
-          path="/admin"
-          element={
-            <PrivateRoute role="admin">
-              <Navigate to="/admin/events" replace />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/events"
-          element={
-            <PrivateRoute role="admin">
-              <EventList />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/event/:eventId"
-          element={
-            <PrivateRoute role="admin">
-              <ManageEvent />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/event/:eventId/results"
-          element={
-            <PrivateRoute role="admin">
-              <AdminResults />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/categories"
-          element={
-            <PrivateRoute role="admin">
-              <CategoryManager />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <PrivateRoute role="admin">
-              <UserManagement />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/event/:eventId/transparency"
-          element={
-            <PrivateRoute role="admin">
-              <TransparencyDashboard />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/event/:eventId/leaderboard"
-          element={
-            <PrivateRoute role="admin">
-              <LiveLeaderboardPage />
-            </PrivateRoute>
-          }
-        />
+          {/* Unauthorized page */}
+          <Route path="/unauthorized" element={<Unauthorized />} />
 
-        <Route path="/judge-dashboard" element={<JudgeDashboard />} />
+          {/* Invitation routes */}
+          <Route path="/accept-invitation" element={<AcceptInvitation />} />
+          <Route
+            path="/shared-events"
+            element={
+              <PrivateRoute>
+                <SharedEventsPage />
+              </PrivateRoute>
+            }
+          />
 
-        {/* Judge route */}
-        <Route
-          path="/judge"
-          element={
-            <PrivateRoute role="judge">
-              <JudgeInterface />
-            </PrivateRoute>
-          }
-        />
+          {/* Auth routes */}
+          <Route
+            path="/login"
+            element={user ? <Navigate to="/admin/events" /> : <Login />}
+          />
+          <Route
+            path="/register"
+            element={user ? <Navigate to="/admin/events" /> : <Register />}
+          />
 
-        {/* Results - any logged-in user */}
-        <Route
-          path="/results"
-          element={
-            <PrivateRoute>
-              <ResultsPage />
-            </PrivateRoute>
-          }
-        />
-        
-        {/* Catch-all redirect */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* Admin routes */}
+          <Route
+            path="/admin"
+            element={
+              <PrivateRoute role="admin">
+                <Navigate to="/admin/events" replace />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/events"
+            element={
+              <PrivateRoute role="admin">
+                <EventList />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/event/:eventId"
+            element={
+              <PrivateRoute role="admin">
+                <ManageEvent />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/event/:eventId/results"
+            element={
+              <PrivateRoute role="admin">
+                <AdminResults />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/categories"
+            element={
+              <PrivateRoute role="admin">
+                <CategoryManager />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <PrivateRoute role="admin">
+                <UserManagement />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/event/:eventId/transparency"
+            element={
+              <PrivateRoute role="admin">
+                <TransparencyDashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/event/:eventId/leaderboard"
+            element={
+              <PrivateRoute role="admin">
+                <LiveLeaderboardPage />
+              </PrivateRoute>
+            }
+          />
+
+          <Route path="/judge-dashboard" element={<JudgeDashboard />} />
+
+          {/* Judge route */}
+          <Route
+            path="/judge"
+            element={
+              <PrivateRoute role="judge">
+                <JudgeInterface />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Results - any logged-in user */}
+          <Route
+            path="/results"
+            element={
+              <PrivateRoute>
+                <ResultsPage />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <PrivateRoute>
+                <UserProfile />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Catch-all redirect */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
     </Router>
   );
@@ -236,9 +251,9 @@ function App() {
   return (
     <ErrorBoundary>
       <AppProvider>
-        <ThemeProvider>
+        <AppThemeProvider>
           <AppContent />
-        </ThemeProvider>
+        </AppThemeProvider>
       </AppProvider>
     </ErrorBoundary>
   );

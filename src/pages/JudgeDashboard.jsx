@@ -22,9 +22,9 @@ import {
   StepLabel,
   StepContent,
 } from '@mui/material';
-import { 
-  AssignmentInd, 
-  CheckCircle, 
+import {
+  AssignmentInd,
+  CheckCircle,
   HourglassEmpty,
   Lock as LockIcon,
   PlayArrow as PlayArrowIcon,
@@ -85,7 +85,7 @@ function JudgeDashboard() {
 
       // Find the active round (first incomplete round in sequence)
       const activeRound = await roundService.getActiveRoundForJudge(foundJudge.id);
-      
+
       if (activeRound) {
         setCurrentRound(activeRound);
         await loadRoundData(activeRound.id, foundJudge.id);
@@ -180,7 +180,7 @@ function JudgeDashboard() {
 
   const handleSubmitScores = async (teamId) => {
     const teamScores = scores[teamId] || {};
-    const allFilled = criteria.every(c => 
+    const allFilled = criteria.every(c =>
       teamScores[c.id] !== undefined && teamScores[c.id] !== ''
     );
 
@@ -274,8 +274,8 @@ function JudgeDashboard() {
   }
 
   const teamsToScore = assignedTeams.filter(team => !absentTeams.has(team.id));
-  const progressPercent = teamsToScore.length > 0 
-    ? (submittedTeams.size / teamsToScore.length) * 100 
+  const progressPercent = teamsToScore.length > 0
+    ? (submittedTeams.size / teamsToScore.length) * 100
     : 0;
 
   const isRoundEditable = currentRound?.status === 'active';
@@ -309,10 +309,10 @@ function JudgeDashboard() {
                   const isComplete = progress?.isComplete;
                   const isPreviousComplete = index === 0 || roundProgress[rounds[index - 1]?.id]?.isComplete;
                   const isAccessible = isPreviousComplete && round.status !== 'draft';
-                  
+
                   return (
-                    <Step 
-                      key={round.id} 
+                    <Step
+                      key={round.id}
                       completed={isComplete}
                       sx={{ cursor: isAccessible ? 'pointer' : 'not-allowed' }}
                       onClick={() => isAccessible && handleRoundSelect(round)}
@@ -321,9 +321,9 @@ function JudgeDashboard() {
                         error={!isPreviousComplete && !isComplete}
                         icon={
                           round.status === 'draft' ? <LockIcon /> :
-                          isComplete ? <CheckCircle sx={{ color: '#10b981' }} /> :
-                          round.id === currentRound?.id ? <PlayArrowIcon sx={{ color: '#3b82f6' }} /> :
-                          undefined
+                            isComplete ? <CheckCircle sx={{ color: '#10b981' }} /> :
+                              round.id === currentRound?.id ? <PlayArrowIcon sx={{ color: '#3b82f6' }} /> :
+                                undefined
                         }
                       >
                         <Box>
@@ -353,10 +353,10 @@ function JudgeDashboard() {
                 sx={{ fontWeight: 600 }}
               />
               <Chip
-                label={currentRound.status === 'active' ? 'Open for Judging' : 
-                       currentRound.status === 'draft' ? 'Not Started' : 'Closed'}
-                color={currentRound.status === 'active' ? 'success' : 
-                       currentRound.status === 'draft' ? 'default' : 'warning'}
+                label={currentRound.status === 'active' ? 'Open for Judging' :
+                  currentRound.status === 'draft' ? 'Not Started' : 'Closed'}
+                color={currentRound.status === 'active' ? 'success' :
+                  currentRound.status === 'draft' ? 'default' : 'warning'}
                 sx={{ fontWeight: 600 }}
               />
               <Chip
@@ -390,17 +390,17 @@ function JudgeDashboard() {
                   {Math.round(progressPercent)}%
                 </Typography>
               </Box>
-              <LinearProgress 
-                variant="determinate" 
-                value={progressPercent} 
-                sx={{ 
-                  height: 8, 
+              <LinearProgress
+                variant="determinate"
+                value={progressPercent}
+                sx={{
+                  height: 8,
                   borderRadius: 4,
                   backgroundColor: '#e2e8f0',
                   '& .MuiLinearProgress-bar': {
                     borderRadius: 4,
-                    background: progressPercent === 100 
-                      ? 'linear-gradient(90deg, #10b981, #059669)' 
+                    background: progressPercent === 100
+                      ? 'linear-gradient(90deg, #10b981, #059669)'
                       : 'linear-gradient(90deg, #3b82f6, #2563eb)'
                   }
                 }}
@@ -419,7 +419,7 @@ function JudgeDashboard() {
         {/* Round Not Active Warning */}
         {currentRound && !isRoundEditable && (
           <Alert severity="warning" sx={{ mb: 3 }}>
-            {currentRound.status === 'draft' 
+            {currentRound.status === 'draft'
               ? 'This round has not started yet. Please wait for the admin to activate it.'
               : 'This round is closed. You can view your scores but cannot make changes.'}
           </Alert>
@@ -535,16 +535,16 @@ function JudgeDashboard() {
                                     size="small"
                                     value={teamScores[criterion.id] ?? ''}
                                     onChange={(e) => handleScoreChange(
-                                      team.id, 
-                                      criterion.id, 
-                                      e.target.value, 
+                                      team.id,
+                                      criterion.id,
+                                      e.target.value,
                                       criterion.max_marks
                                     )}
                                     disabled={isSubmitted || !isRoundEditable}
-                                    inputProps={{ 
-                                      min: 0, 
-                                      max: criterion.max_marks, 
-                                      step: 0.5 
+                                    inputProps={{
+                                      min: 0,
+                                      max: criterion.max_marks,
+                                      step: 0.5
                                     }}
                                     sx={{ width: '140px' }}
                                     placeholder={`0-${criterion.max_marks}`}
@@ -558,6 +558,10 @@ function JudgeDashboard() {
                           </TableBody>
                         </Table>
                       </TableContainer>
+
+
+
+
 
                       <Box sx={{ p: 3, display: 'flex', justifyContent: 'flex-end', gap: 2, background: '#fafafa' }}>
                         {isRoundEditable && !isSubmitted && (
@@ -593,7 +597,8 @@ function JudgeDashboard() {
                         )}
                       </Box>
                     </>
-                  )}
+                  )
+                  }
                 </Card>
               );
             })}
@@ -602,9 +607,9 @@ function JudgeDashboard() {
 
         {/* All Complete Message */}
         {submittedTeams.size === teamsToScore.length && teamsToScore.length > 0 && (
-          <Card sx={{ 
-            p: 4, 
-            textAlign: 'center', 
+          <Card sx={{
+            p: 4,
+            textAlign: 'center',
             background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
             borderRadius: '16px'
           }}>
@@ -613,14 +618,14 @@ function JudgeDashboard() {
               Round Complete! 🎉
             </Typography>
             <Typography color="textSecondary">
-              {rounds.findIndex(r => r.id === currentRound?.id) < rounds.length - 1 
+              {rounds.findIndex(r => r.id === currentRound?.id) < rounds.length - 1
                 ? 'You can now proceed to the next round.'
                 : 'You have completed all your evaluations. Thank you!'}
             </Typography>
           </Card>
         )}
       </Box>
-    </Box>
+    </Box >
   );
 }
 

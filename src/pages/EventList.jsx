@@ -12,14 +12,22 @@ import {
   DialogActions,
   TextField,
   Chip,
+  IconButton,
+  Tooltip,
+  CircularProgress
 } from "@mui/material";
+import DeleteIcon from '@mui/icons-material/Delete';
+import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import Navigation from "../components/Navigation";
 import { eventService } from "../services/eventService";
 
 function EventList() {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
   const [currentEvent, setCurrentEvent] = useState({
     name: "",
     description: "",
@@ -29,14 +37,22 @@ function EventList() {
 
   useEffect(() => {
     loadEvents();
-  }, []);
+  }, [showRecycleBin]);
 
   const loadEvents = async () => {
+    setLoading(true);
     try {
-      const eventsData = await eventService.getAllEvents();
-      setEvents(eventsData);
+      if (showRecycleBin) {
+        const deletedEvents = await eventService.getDeletedEvents();
+        setEvents(deletedEvents);
+      } else {
+        const eventsData = await eventService.getAllEvents();
+        setEvents(eventsData);
+      }
     } catch (error) {
       console.error('Error loading events:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -75,13 +91,47 @@ function EventList() {
   };
 
   const handleDeleteEvent = async (eventId) => {
-    if (window.confirm("Are you sure you want to delete this event?")) {
+    if (window.confirm("Are you sure you want to move this event to the recycle bin?")) {
       try {
         await eventService.deleteEvent(eventId);
-        const updatedEvents = events.filter((e) => e.id !== eventId);
-        setEvents(updatedEvents);
+        await loadEvents();
       } catch (error) {
         console.error('Error deleting event:', error);
+        // Check for Postgres error "undefined_column" (code 42703) or message text
+        if (error.code === '42703' || (error.message && error.message.includes('deleted_at'))) {
+          if (window.confirm("Recycle Bin is not enabled yet (database update missing). Do you want to permanently delete this event instead?")) {
+            try {
+              await eventService.permanentlyDeleteEvent(eventId);
+              await loadEvents();
+            } catch (permError) {
+              console.error('Error permanently deleting:', permError);
+              alert('Failed to permanently delete event: ' + permError.message);
+            }
+          }
+        } else {
+          alert('Failed to delete event: ' + (error.message || 'Unknown error'));
+        }
+      }
+    }
+  };
+
+  const handleRestoreEvent = async (eventId) => {
+    try {
+      await eventService.restoreEvent(eventId);
+      await loadEvents();
+    } catch (error) {
+      console.error('Error restoring event:', error);
+      alert('Failed to restore event. Please try again.');
+    }
+  };
+
+  const handlePermanentDelete = async (eventId) => {
+    if (window.confirm("Are you sure you want to PERMANENTLY delete this event? This action cannot be undone.")) {
+      try {
+        await eventService.permanentlyDeleteEvent(eventId);
+        await loadEvents();
+      } catch (error) {
+        console.error('Error permanently deleting event:', error);
         alert('Failed to delete event. Please try again.');
       }
     }
@@ -115,7 +165,7 @@ function EventList() {
                 fontSize: "2.75rem"
               }}
             >
-              My Events
+              {showRecycleBin ? "Recycle Bin" : "My Events"}
             </Typography>
             <Typography
               variant="body1"
@@ -125,35 +175,68 @@ function EventList() {
                 fontWeight: 500
               }}
             >
-              Manage your hackathons and competitions
+              {showRecycleBin ? "Manage deleted events" : "Manage your hackathons and competitions"}
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            onClick={handleCreateEvent}
-            sx={{
-              background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
-              color: "white",
-              textTransform: "none",
-              px: 4,
-              py: 1.75,
-              fontSize: "1.05rem",
-              fontWeight: 600,
-              borderRadius: "12px",
-              boxShadow: "0 4px 14px rgba(124, 58, 237, 0.3)",
-              transition: "all 0.3s ease",
-              "&:hover": {
-                background: "linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%)",
-                transform: "translateY(-2px)",
-                boxShadow: "0 8px 20px rgba(124, 58, 237, 0.4)"
-              }
-            }}
-          >
-            + Create Event
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button
+              variant={showRecycleBin ? "contained" : "outlined"}
+              onClick={() => setShowRecycleBin(!showRecycleBin)}
+              color={showRecycleBin ? "secondary" : "primary"}
+              startIcon={showRecycleBin ? <Box component="span" sx={{ fontSize: '1.2rem' }}>←</Box> : <DeleteIcon />}
+              sx={{
+                textTransform: "none",
+                px: 3,
+                py: 1.75,
+                fontSize: "1.05rem",
+                fontWeight: 600,
+                borderRadius: "12px",
+                borderColor: showRecycleBin ? "transparent" : "#64748b",
+                color: showRecycleBin ? "white" : "#64748b",
+                background: showRecycleBin ? "#64748b" : "transparent",
+                "&:hover": {
+                  background: showRecycleBin ? "#475569" : "rgba(100, 116, 139, 0.08)",
+                  borderColor: showRecycleBin ? "transparent" : "#475569",
+                  color: showRecycleBin ? "white" : "#475569",
+                }
+              }}
+            >
+              {showRecycleBin ? "Back to Events" : "Recycle Bin"}
+            </Button>
+
+            {!showRecycleBin && (
+              <Button
+                variant="contained"
+                onClick={handleCreateEvent}
+                sx={{
+                  background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
+                  color: "white",
+                  textTransform: "none",
+                  px: 4,
+                  py: 1.75,
+                  fontSize: "1.05rem",
+                  fontWeight: 600,
+                  borderRadius: "12px",
+                  boxShadow: "0 4px 14px rgba(124, 58, 237, 0.3)",
+                  transition: "all 0.3s ease",
+                  "&:hover": {
+                    background: "linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%)",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 8px 20px rgba(124, 58, 237, 0.4)"
+                  }
+                }}
+              >
+                + Create Event
+              </Button>
+            )}
+          </Box>
         </Box>
 
-        {events.length === 0 ? (
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+            <CircularProgress size={60} sx={{ color: '#7c3aed' }} />
+          </Box>
+        ) : events.length === 0 ? (
           <Card
             sx={{
               p: 10,
@@ -172,7 +255,7 @@ function EventList() {
                 mb: 2
               }}
             >
-              No Events Yet
+              {showRecycleBin ? "Recycle Bin Empty" : "No Events Yet"}
             </Typography>
             <Typography
               variant="body1"
@@ -184,31 +267,35 @@ function EventList() {
                 mx: "auto"
               }}
             >
-              Create your first event to get started with fair, automated judging
+              {showRecycleBin
+                ? "No deleted events found."
+                : "Create your first event to get started with fair, automated judging"}
             </Typography>
-            <Button
-              variant="contained"
-              onClick={handleCreateEvent}
-              sx={{
-                background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
-                color: "white",
-                textTransform: "none",
-                px: 5,
-                py: 2,
-                fontSize: "1.1rem",
-                fontWeight: 600,
-                borderRadius: "12px",
-                boxShadow: "0 4px 14px rgba(124, 58, 237, 0.3)",
-                transition: "all 0.3s ease",
-                "&:hover": {
-                  background: "linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%)",
-                  transform: "translateY(-2px)",
-                  boxShadow: "0 8px 20px rgba(124, 58, 237, 0.4)"
-                }
-              }}
-            >
-              Create Your First Event
-            </Button>
+            {!showRecycleBin && (
+              <Button
+                variant="contained"
+                onClick={handleCreateEvent}
+                sx={{
+                  background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
+                  color: "white",
+                  textTransform: "none",
+                  px: 5,
+                  py: 2,
+                  fontSize: "1.1rem",
+                  fontWeight: 600,
+                  borderRadius: "12px",
+                  boxShadow: "0 4px 14px rgba(124, 58, 237, 0.3)",
+                  transition: "all 0.3s ease",
+                  "&:hover": {
+                    background: "linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%)",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 8px 20px rgba(124, 58, 237, 0.4)"
+                  }
+                }}
+              >
+                Create Your First Event
+              </Button>
+            )}
           </Card>
         ) : (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -222,6 +309,7 @@ function EventList() {
                   boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
                   transition: "all 0.3s ease",
                   border: "1px solid rgba(124, 58, 237, 0.1)",
+                  opacity: showRecycleBin ? 0.9 : 1,
                   "&:hover": {
                     boxShadow: "0 12px 35px rgba(124, 58, 237, 0.2)",
                     transform: "translateY(-4px)",
@@ -265,7 +353,7 @@ function EventList() {
                         mb: 0.5
                       }}
                     >
-                      <strong style={{ color: "#475569" }}>Start:</strong> {formatDate(event.startDate)}
+                      <strong style={{ color: "#475569" }}>Start:</strong> {formatDate(event.start_date || event.startDate)}
                     </Typography>
                     <Typography
                       variant="body2"
@@ -275,57 +363,118 @@ function EventList() {
                         fontSize: "0.95rem"
                       }}
                     >
-                      <strong style={{ color: "#475569" }}>End:</strong> {formatDate(event.endDate)}
+                      <strong style={{ color: "#475569" }}>End:</strong> {formatDate(event.end_date || event.endDate)}
                     </Typography>
+                    {showRecycleBin && event.deleted_at && (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: "#ef4444",
+                          fontWeight: 600,
+                          fontSize: "0.85rem",
+                          mt: 1
+                        }}
+                      >
+                        Deleted: {new Date(event.deleted_at).toLocaleDateString()}
+                      </Typography>
+                    )}
                   </Box>
 
                   <Box sx={{ display: "flex", gap: 1.5 }}>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      onClick={() => handleManageEvent(event.id)}
-                      sx={{
-                        background: "#3b82f6",
-                        color: "white",
-                        textTransform: "none",
-                        fontWeight: 700,
-                        borderRadius: "10px",
-                        py: 1.3,
-                        fontSize: "0.95rem",
-                        boxShadow: "0 2px 8px rgba(59, 130, 246, 0.25)",
-                        transition: "all 0.3s ease",
-                        "&:hover": {
-                          background: "#2563eb",
-                          transform: "translateY(-2px)",
-                          boxShadow: "0 4px 12px rgba(59, 130, 246, 0.35)"
-                        }
-                      }}
-                    >
-                      Manage Event
-                    </Button>
-                    <Button
-                      variant="contained"
-                      onClick={() => handleDeleteEvent(event.id)}
-                      sx={{
-                        background: "#ef4444",
-                        color: "white",
-                        textTransform: "none",
-                        fontWeight: 700,
-                        borderRadius: "10px",
-                        px: 3,
-                        py: 1.3,
-                        minWidth: "auto",
-                        boxShadow: "0 2px 8px rgba(239, 68, 68, 0.25)",
-                        transition: "all 0.3s ease",
-                        "&:hover": {
-                          background: "#dc2626",
-                          transform: "translateY(-2px)",
-                          boxShadow: "0 4px 12px rgba(239, 68, 68, 0.35)"
-                        }
-                      }}
-                    >
-                      Delete
-                    </Button>
+                    {showRecycleBin ? (
+                      <>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          onClick={() => handleRestoreEvent(event.id)}
+                          startIcon={<RestoreFromTrashIcon />}
+                          sx={{
+                            background: "#22c55e",
+                            color: "white",
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderRadius: "10px",
+                            py: 1.3,
+                            fontSize: "0.95rem",
+                            boxShadow: "0 2px 8px rgba(34, 197, 94, 0.25)",
+                            transition: "all 0.3s ease",
+                            "&:hover": {
+                              background: "#16a34a",
+                              transform: "translateY(-2px)",
+                              boxShadow: "0 4px 12px rgba(34, 197, 94, 0.35)"
+                            }
+                          }}
+                        >
+                          Restore
+                        </Button>
+                        <Tooltip title="Delete Permanently">
+                          <IconButton
+                            onClick={() => handlePermanentDelete(event.id)}
+                            sx={{
+                              color: "#ef4444",
+                              background: "rgba(239, 68, 68, 0.1)",
+                              borderRadius: "10px",
+                              width: "48px",
+                              "&:hover": {
+                                background: "#ef4444",
+                                color: "white"
+                              }
+                            }}
+                          >
+                            <DeleteForeverIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          onClick={() => handleManageEvent(event.id)}
+                          sx={{
+                            background: "#3b82f6",
+                            color: "white",
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderRadius: "10px",
+                            py: 1.3,
+                            fontSize: "0.95rem",
+                            boxShadow: "0 2px 8px rgba(59, 130, 246, 0.25)",
+                            transition: "all 0.3s ease",
+                            "&:hover": {
+                              background: "#2563eb",
+                              transform: "translateY(-2px)",
+                              boxShadow: "0 4px 12px rgba(59, 130, 246, 0.35)"
+                            }
+                          }}
+                        >
+                          Manage Event
+                        </Button>
+                        <Button
+                          variant="contained"
+                          onClick={() => handleDeleteEvent(event.id)}
+                          sx={{
+                            background: "#ef4444",
+                            color: "white",
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderRadius: "10px",
+                            px: 3,
+                            py: 1.3,
+                            minWidth: "auto",
+                            boxShadow: "0 2px 8px rgba(239, 68, 68, 0.25)",
+                            transition: "all 0.3s ease",
+                            "&:hover": {
+                              background: "#dc2626",
+                              transform: "translateY(-2px)",
+                              boxShadow: "0 4px 12px rgba(239, 68, 68, 0.35)"
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </>
+                    )}
                   </Box>
                 </CardContent>
               </Card>

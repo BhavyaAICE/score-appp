@@ -20,7 +20,8 @@ export const eventService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    // Client-side filtering to handle cases where deleted_at column might not exist yet
+    return (data || []).filter(e => !e.deleted_at);
   },
 
   async createEvent(eventData) {
@@ -47,6 +48,36 @@ export const eventService = {
   },
 
   async deleteEvent(eventId) {
+    // Soft delete
+    const { error } = await supabase
+      .from('events')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', eventId);
+
+    if (error) throw error;
+  },
+
+  async getDeletedEvents() {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    // Client-side filtering
+    return (data || []).filter(e => e.deleted_at);
+  },
+
+  async restoreEvent(eventId) {
+    const { error } = await supabase
+      .from('events')
+      .update({ deleted_at: null })
+      .eq('id', eventId);
+
+    if (error) throw error;
+  },
+
+  async permanentlyDeleteEvent(eventId) {
     const { error } = await supabase
       .from('events')
       .delete()

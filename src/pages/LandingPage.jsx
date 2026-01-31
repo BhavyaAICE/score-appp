@@ -1,20 +1,22 @@
 import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import { useApp } from "../context/AppContext";
 import { ThemeContext } from "../context/ThemeContext";
 import AccessibilitySettings from "../components/AccessibilitySettings";
 import "../styles/LandingPage.css";
 
 function LandingPage() {
   const navigate = useNavigate();
+  const { user } = useApp();
   const { themeName, toggleTheme } = useContext(ThemeContext);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showA11ySettings, setShowA11ySettings] = useState(false);
 
   return (
     <div className={`landing-page ${themeName}`}>
-      <AccessibilitySettings 
-        isOpen={showA11ySettings} 
-        onClose={() => setShowA11ySettings(false)} 
+      <AccessibilitySettings
+        isOpen={showA11ySettings}
+        onClose={() => setShowA11ySettings(false)}
       />
       <nav className="landing-nav" role="navigation" aria-label="Main navigation">
         <div className="nav-container-wide">
@@ -33,7 +35,7 @@ function LandingPage() {
               <button className={`theme-btn ${themeName === 'dark' ? 'active' : ''}`} onClick={() => toggleTheme("dark")} aria-pressed={themeName === 'dark'}>Dark</button>
               <button className={`theme-btn ${themeName === 'event' ? 'active' : ''}`} onClick={() => toggleTheme("event")} aria-pressed={themeName === 'event'}>Event</button>
             </div>
-            <button 
+            <button
               className="a11y-btn"
               onClick={() => setShowA11ySettings(true)}
               aria-label="Open accessibility settings"
@@ -53,16 +55,20 @@ function LandingPage() {
               }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/>
-                <circle cx="12" cy="8" r="2"/>
-                <path d="M12 10v8"/>
-                <path d="M8 14l4-2 4 2"/>
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="8" r="2" />
+                <path d="M12 10v8" />
+                <path d="M8 14l4-2 4 2" />
               </svg>
             </button>
-            <button className="login-btn" onClick={() => navigate("/login")}>Login</button>       
+            {user ? (
+              <button className="login-btn" onClick={() => navigate("/admin/events")}>Dashboard</button>
+            ) : (
+              <button className="login-btn" onClick={() => navigate("/login")}>Login</button>
+            )}
           </div>
-          <button 
-            className="hamburger" 
+          <button
+            className="hamburger"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label={isMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={isMenuOpen}

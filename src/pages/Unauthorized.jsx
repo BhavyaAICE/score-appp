@@ -36,7 +36,7 @@ function Unauthorized() {
         }}>
           🚫
         </div>
-        
+
         <h1 style={{
           fontSize: '28px',
           color: '#1e3a5f',
@@ -44,13 +44,13 @@ function Unauthorized() {
         }}>
           Access Denied
         </h1>
-        
+
         <p style={{
           color: '#64748b',
           marginBottom: '24px',
           lineHeight: '1.6'
         }}>
-          You don't have permission to access this page. 
+          You don't have permission to access this page.
           {userProfile && (
             <span> Your current role is <strong>{userProfile.role}</strong>.</span>
           )}
@@ -82,7 +82,7 @@ function Unauthorized() {
           >
             Go Back
           </button>
-          
+
           <button
             onClick={() => navigate('/')}
             style={{
@@ -103,7 +103,7 @@ function Unauthorized() {
             <button
               onClick={async () => {
                 await logout();
-                navigate('/login');
+                navigate('/');
               }}
               style={{
                 padding: '12px 24px',

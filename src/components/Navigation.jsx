@@ -14,13 +14,14 @@ function Navigation({ breadcrumb }) {
   const { highContrastMode } = useContext(ThemeContext);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showA11ySettings, setShowA11ySettings] = useState(false);
-  
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const navItems = [
     { label: 'Events', path: '/admin/events' },
     { label: 'Users', path: '/admin/users' },
+    { label: 'Showcase', path: '/showcase' },
   ];
 
   const handleDrawerToggle = () => {
@@ -35,7 +36,7 @@ function Navigation({ breadcrumb }) {
       <List>
         {navItems.map((item) => (
           <ListItem key={item.label} disablePadding>
-            <ListItemButton 
+            <ListItemButton
               sx={{ textAlign: 'center' }}
               onClick={() => navigate(item.path)}
             >
@@ -45,9 +46,12 @@ function Navigation({ breadcrumb }) {
         ))}
         {user && (
           <ListItem disablePadding>
-            <ListItemButton 
+            <ListItemButton
               sx={{ textAlign: 'center' }}
-              onClick={logout}
+              onClick={async () => {
+                await logout();
+                navigate('/');
+              }}
             >
               <ListItemText primary="Logout" sx={{ color: '#ef4444' }} />
             </ListItemButton>
@@ -66,7 +70,8 @@ function Navigation({ breadcrumb }) {
         sx={{
           backgroundColor: highContrastMode ? "#ffffff" : "white",
           borderBottom: highContrastMode ? "2px solid #000000" : "1px solid #e0e0e0",
-          color: "#333"
+          color: "#333",
+          zIndex: (theme) => theme.zIndex.drawer + 1
         }}
         role="banner"
       >
@@ -78,7 +83,7 @@ function Navigation({ breadcrumb }) {
                 aria-label="Open navigation menu"
                 edge="start"
                 onClick={handleDrawerToggle}
-                sx={{ 
+                sx={{
                   color: '#333',
                   minHeight: '44px',
                   minWidth: '44px',
@@ -127,7 +132,7 @@ function Navigation({ breadcrumb }) {
               <Button
                 key={item.label}
                 onClick={() => navigate(item.path)}
-                sx={{ 
+                sx={{
                   color: '#333',
                   textTransform: 'none',
                   fontWeight: 500,
@@ -141,11 +146,11 @@ function Navigation({ breadcrumb }) {
                 {item.label}
               </Button>
             ))}
-            
+
             <IconButton
               onClick={() => setShowA11ySettings(true)}
               aria-label="Open accessibility settings"
-              sx={{ 
+              sx={{
                 color: '#666',
                 minHeight: '44px',
                 minWidth: '44px',
@@ -157,11 +162,32 @@ function Navigation({ breadcrumb }) {
             >
               <AccessibilityNewIcon />
             </IconButton>
-            
+
             {user && (
               <>
-                <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1 }}>
-                  <Avatar 
+                <Box
+                  onClick={() => navigate('/profile')}
+                  sx={{
+                    display: { xs: 'none', md: 'flex' },
+                    alignItems: 'center',
+                    gap: 1,
+                    cursor: 'pointer',
+                    p: 0.5,
+                    borderRadius: '8px',
+                    transition: 'background-color 0.2s',
+                    '&:hover': {
+                      bgcolor: 'rgba(0,0,0,0.04)'
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      navigate('/profile');
+                    }
+                  }}
+                >
+                  <Avatar
                     sx={{ width: 32, height: 32, bgcolor: '#e0e7ff', color: '#4f46e5' }}
                     alt={user.username || user.name || "User"}
                   >
@@ -180,7 +206,10 @@ function Navigation({ breadcrumb }) {
                 {!isMobile && (
                   <Button
                     variant="outlined"
-                    onClick={logout}
+                    onClick={async () => {
+                      await logout();
+                      navigate('/');
+                    }}
                     aria-label="Log out of your account"
                     sx={{
                       borderColor: "#ef4444",
@@ -215,7 +244,7 @@ function Navigation({ breadcrumb }) {
           </Box>
         </Toolbar>
       </AppBar>
-      
+
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -230,10 +259,10 @@ function Navigation({ breadcrumb }) {
       >
         {drawer}
       </Drawer>
-      
-      <AccessibilitySettings 
-        isOpen={showA11ySettings} 
-        onClose={() => setShowA11ySettings(false)} 
+
+      <AccessibilitySettings
+        isOpen={showA11ySettings}
+        onClose={() => setShowA11ySettings(false)}
       />
     </>
   );

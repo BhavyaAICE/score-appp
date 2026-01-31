@@ -118,30 +118,30 @@ function ManageEvent() {
   }
 
   const tabs = [
-    { 
-      label: "Overview", 
+    {
+      label: "Overview",
       icon: <DashboardOutlinedIcon sx={{ fontSize: "1.1rem", mr: 1 }} />,
-      count: null 
+      count: null
     },
-    { 
-      label: "Teams", 
+    {
+      label: "Teams",
       icon: <GroupOutlinedIcon sx={{ fontSize: "1.1rem", mr: 1 }} />,
-      count: teams.length 
+      count: teams.length
     },
-    { 
-      label: "Judges", 
+    {
+      label: "Judges",
       icon: <GavelOutlinedIcon sx={{ fontSize: "1.1rem", mr: 1 }} />,
-      count: judges.length 
+      count: judges.length
     },
-    { 
-      label: "Rounds", 
+    {
+      label: "Rounds",
       icon: <SyncOutlinedIcon sx={{ fontSize: "1.1rem", mr: 1 }} />,
-      count: rounds.length 
+      count: rounds.length
     },
-    { 
-      label: "Venues", 
+    {
+      label: "Venues",
       icon: <PlaceOutlinedIcon sx={{ fontSize: "1.1rem", mr: 1 }} />,
-      count: venues.length 
+      count: venues.length
     },
     {
       label: "Criteria",
@@ -149,7 +149,7 @@ function ManageEvent() {
       count: criteria.length
     },
   ];
-  
+
   // A helper component for the stat cards to avoid repetition
   const StatCard = ({ title, value, icon }) => (
     <Card
@@ -235,8 +235,8 @@ function ManageEvent() {
 
       <Box sx={{ maxWidth: "1400px", mx: "auto", px: 4, py: 4 }}>
         {/* Event Header */}
-        <Box sx={{ 
-          mb: 4, 
+        <Box sx={{
+          mb: 4,
           p: 4,
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           borderRadius: '20px',
@@ -279,7 +279,8 @@ function ManageEvent() {
             value={currentTab}
             onChange={handleTabChange}
             variant="scrollable"
-            scrollButtons="auto"
+            scrollButtons
+            allowScrollButtonsMobile
             sx={{
               px: 2,
               py: 1,
@@ -287,7 +288,7 @@ function ManageEvent() {
                 textTransform: "none",
                 fontSize: "0.95rem",
                 fontWeight: 500,
-                color: "#ffffff",
+                color: "#64748b",
                 minHeight: "60px",
                 px: 3,
                 py: 2,
@@ -336,8 +337,8 @@ function ManageEvent() {
                           px: 1.5,
                           py: 0.3,
                           borderRadius: "12px",
-                          background: currentTab === index 
-                            ? "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)" 
+                          background: currentTab === index
+                            ? "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)"
                             : "#e2e8f0",
                           color: currentTab === index ? "white" : "#64748b",
                           fontSize: "0.75rem",
@@ -395,12 +396,12 @@ function ManageEvent() {
                     startIcon={<GroupOutlinedIcon />}
                     sx={{
                       background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-                      textTransform: "none", 
-                      px: 3, 
-                      py: 1.5, 
-                      fontSize: "0.95rem", 
+                      textTransform: "none",
+                      px: 3,
+                      py: 1.5,
+                      fontSize: "0.95rem",
                       fontWeight: 600,
-                      borderRadius: "14px", 
+                      borderRadius: "14px",
                       boxShadow: "0 4px 14px rgba(124, 58, 237, 0.25)",
                       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                       "&:hover": {
@@ -487,11 +488,11 @@ function ManageEvent() {
                     startIcon={<SyncOutlinedIcon />}
                     sx={{
                       borderColor: "#7c3aed",
-                      color: "#ffffff",
-                      textTransform: "none", 
-                      px: 3, 
-                      py: 1.5, 
-                      fontSize: "0.95rem", 
+                      color: "#7c3aed",
+                      textTransform: "none",
+                      px: 3,
+                      py: 1.5,
+                      fontSize: "0.95rem",
                       fontWeight: 600,
                       borderRadius: "14px",
                       borderWidth: "2px",
