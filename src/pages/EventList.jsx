@@ -19,8 +19,10 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import DownloadIcon from '@mui/icons-material/Download';
 import Navigation from "../components/Navigation";
 import { eventService } from "../services/eventService";
+import { exportService } from "../utils/exportUtils";
 import { createTestScenario } from "../utils/testScenarioGenerator";
 
 function EventList() {
@@ -45,7 +47,28 @@ function EventList() {
     try {
       if (showRecycleBin) {
         const deletedEvents = await eventService.getDeletedEvents();
-        setEvents(deletedEvents);
+
+        // Check for retention policy (30 days) and auto-delete
+        const now = new Date();
+        const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30));
+
+        const eventsToKeep = [];
+        for (const event of deletedEvents) {
+          const deletedDate = new Date(event.deleted_at);
+          if (deletedDate < thirtyDaysAgo) {
+            console.log(`Auto-deleting expired event: ${event.name} (Deleted: ${deletedDate})`);
+            try {
+              await eventService.permanentlyDeleteEvent(event.id);
+            } catch (err) {
+              console.error(`Failed to auto-delete event ${event.id}`, err);
+              // Keep it in list if failed to delete so user sees it
+              eventsToKeep.push(event);
+            }
+          } else {
+            eventsToKeep.push(event);
+          }
+        }
+        setEvents(eventsToKeep);
       } else {
         const eventsData = await eventService.getAllEvents();
         setEvents(eventsData);
@@ -140,6 +163,18 @@ function EventList() {
 
   const handleManageEvent = (eventId) => {
     navigate(`/admin/event/${eventId}`);
+  };
+
+  const handleDownloadZip = async (eventId) => {
+    try {
+      setLoading(true);
+      await exportService.exportEventData(eventId);
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download event data.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGenerateTestScenario = async () => {
@@ -452,6 +487,23 @@ function EventList() {
                             <DeleteForeverIcon />
                           </IconButton>
                         </Tooltip>
+                        <Tooltip title="Download Data">
+                          <IconButton
+                            onClick={() => handleDownloadZip(event.id)}
+                            sx={{
+                              color: "#3b82f6",
+                              background: "rgba(59, 130, 246, 0.1)",
+                              borderRadius: "10px",
+                              width: "48px",
+                              "&:hover": {
+                                background: "#3b82f6",
+                                color: "white"
+                              }
+                            }}
+                          >
+                            <DownloadIcon />
+                          </IconButton>
+                        </Tooltip>
                       </>
                     ) : (
                       <>
@@ -652,7 +704,7 @@ function EventList() {
           </DialogActions>
         </Dialog>
       </Box>
-    </Box>
+    </Box >
   );
 }
 
