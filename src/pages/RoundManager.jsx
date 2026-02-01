@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { computeRound, checkRoundReadiness } from '../services/computeRoundService';
 import { executeSelection, SelectionModes } from '../services/selectionService';
+import { executeSelection, SelectionModes } from '../services/selectionService';
 import { exportRoundCSV, exportRoundPDF, downloadFile, downloadPDF } from '../services/exportService';
+import { importService } from '../services/importService';
 import './RoundManager.css';
 
 function RoundManager({ eventId }) {
@@ -14,6 +16,12 @@ function RoundManager({ eventId }) {
   const [readiness, setReadiness] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  // Import State
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importStats, setImportStats] = useState(null);
+  const [importJudge, setImportJudge] = useState('');
 
   const [newCriterion, setNewCriterion] = useState({
     name: '',
@@ -276,8 +284,93 @@ function RoundManager({ eventId }) {
     if (result.success) {
       downloadPDF(result.pdf, result.filename);
       setMessage('PDF downloaded');
-    } else {
-      setMessage(`Error: ${result.error}`);
+    }
+  }
+
+  async function handleImportScores() {
+    if (!importJudge) {
+      setMessage('Please select a judge for import');
+      return;
+    }
+
+    if (!importText) {
+      setMessage('Please paste CSV content');
+      return;
+    }
+
+    setLoading(true);
+    const result = importService.parseCSV(importText, criteria);
+    setLoading(false);
+
+    if (!result.success) {
+      setMessage(`Parse Error: ${result.error}`);
+      return;
+    }
+
+    setImportStats(result.stats);
+
+    if (window.confirm(`Parsed ${result.data.length} scores. Import them for user ${assignedJudges.find(j => j.judge_id === importJudge)?.judges?.name}?`)) {
+      setLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
+
+      const computeRawTotal = (scores) => {
+        let total = 0;
+        let weightSum = 0;
+        criteria.forEach(c => {
+          const score = scores[c.id] || 0;
+          total += (score / c.max_marks) * c.weight;
+          weightSum += c.weight;
+        });
+        return weightSum > 0 ? (total / weightSum) * 100 : 0;
+      };
+
+      for (const item of result.data) {
+        // Save to DB
+        // We need component to be cleaner, maybe move this logic to service? 
+        // For now, implementing inline to save time as requested.
+
+        const rawTotal = computeRawTotal(item.scores);
+
+        const evaluation = {
+          round_id: selectedRound,
+          judge_id: importJudge,
+          team_id: item.team_id,
+          scores: item.scores,
+          raw_total: rawTotal,
+          note: 'Imported via Admin',
+          is_draft: false,
+          submitted_at: new Date().toISOString(),
+          version: 1
+        };
+
+        // Upsert based on Team + Judge + Round
+        // First get existing ID if any
+        const { data: existing } = await supabase
+          .from('round_evaluations')
+          .select('id')
+          .eq('round_id', selectedRound)
+          .eq('judge_id', importJudge)
+          .eq('team_id', item.team_id)
+          .maybeSingle();
+
+        let dbRes;
+        if (existing) {
+          dbRes = await supabase.from('round_evaluations').update(evaluation).eq('id', existing.id);
+        } else {
+          dbRes = await supabase.from('round_evaluations').insert(evaluation);
+        }
+
+        if (dbRes.error) errorCount++;
+        else successCount++;
+      }
+
+      setLoading(false);
+      setMessage(`Import complete. Success: ${successCount}, Errors: ${errorCount}`);
+      setShowImport(false);
+      setImportText('');
+      setImportStats(null);
+      checkReadiness();
     }
   }
 
@@ -577,12 +670,71 @@ function RoundManager({ eventId }) {
                     </button>
                   </div>
                 </div>
+
+                <div className="import-section">
+                  <h3>Import Scores</h3>
+                  <p>Upload/Paste scores on behalf of offline judges.</p>
+                  <button onClick={() => setShowImport(true)} className="btn-secondary">
+                    Import Scores
+                  </button>
+                </div>
               </>
             )}
           </div>
         </div>
       )}
-    </div>
+
+
+      {
+        showImport && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <h3>Import Judge Scores</h3>
+              <div className="form-group">
+                <label>Select Judge (to import on behalf of):</label>
+                <select value={importJudge} onChange={(e) => setImportJudge(e.target.value)}>
+                  <option value="">-- Select Judge --</option>
+                  {assignedJudges.map(aj => (
+                    <option key={aj.judge_id} value={aj.judge_id}>
+                      {aj.judges?.name} ({aj.judge_type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Paste CSV Data:</label>
+                <p className="hint">Format: Team ID, [Criteria Name 1], [Criteria Name 2]...</p>
+                <textarea
+                  rows={10}
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder={importService.generateTemplate(criteria)}
+                  style={{ width: '100%', fontFamily: 'monospace' }}
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  onClick={() => {
+                    const template = importService.generateTemplate(criteria);
+                    setImportText(template);
+                  }}
+                  className="btn-secondary"
+                >
+                  Load Template Header
+                </button>
+                <div style={{ flex: 1 }}></div>
+                <button onClick={() => setShowImport(false)} className="btn-secondary">Cancel</button>
+                <button onClick={handleImportScores} disabled={loading} className="btn-primary">
+                  {loading ? 'Importing...' : 'Parse & Import'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div >
   );
 }
 

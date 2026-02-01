@@ -59,6 +59,16 @@ function JudgeDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  // Offline Check
+  useEffect(() => {
+    if (!navigator.onLine) {
+      setError('You are currently offline. Some data may not load. If you have already loaded the round, you can continue judging.');
+    }
+    const handleOffline = () => setError('You are currently offline. Please do not refresh the page.');
+    window.addEventListener('offline', handleOffline);
+    return () => window.removeEventListener('offline', handleOffline);
+  }, []);
+
   const loadJudgeData = async () => {
     try {
       // Find judge by token

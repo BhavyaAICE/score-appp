@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { computeRawTotal } from '../services/normalizationService';
+import { offlineService } from '../services/offlineService';
 import './JudgeEvaluation.css';
 
 function JudgeEvaluation({ judgeId, roundId }) {
@@ -14,6 +15,50 @@ function JudgeEvaluation({ judgeId, roundId }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [isDraft, setIsDraft] = useState(true);
+
+  // Offline state
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingSync, setPendingSync] = useState(0);
+
+  useEffect(() => {
+    // Network status listeners
+    const handleOnline = () => {
+      setIsOnline(true);
+      attemptSync();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Check for pending items on mount
+    updatePendingCount();
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const updatePendingCount = () => {
+    const stored = offlineService.getStoredEvaluations();
+    setPendingSync(Object.keys(stored).length);
+  };
+
+  const attemptSync = async () => {
+    if (offlineService.isOnline()) {
+      setMessage('Syncing offline evaluations...');
+      const result = await offlineService.syncPendingEvaluations();
+      if (result.success && result.syncedCount > 0) {
+        setMessage(`Synced ${result.syncedCount} evaluations from offline storage.`);
+        // Reload data to ensure consistency
+        if (judgeId && roundId) loadRoundData();
+      } else if (result.errors?.length > 0) {
+        setMessage(`Sync failed for some items: ${result.errors[0].error}`);
+      }
+      updatePendingCount();
+    }
+  };
 
   useEffect(() => {
     if (judgeId && roundId) {
@@ -73,17 +118,35 @@ function JudgeEvaluation({ judgeId, roundId }) {
       .from('round_evaluations')
       .select('*')
       .eq('round_id', roundId)
+      .eq('round_id', roundId)
       .eq('judge_id', judgeId);
 
-    if (evalsError) {
+    if (evalsError && navigator.onLine) {
+      // Only log error if we expected to be online. 
+      // If we are offline, we might fail to fetch, so we look at local storage.
       console.error('Error loading evaluations:', evalsError);
       return;
     }
 
     const evalsMap = {};
+
+    // 1. Fill with server data
     evalsData?.forEach(evaluation => {
       evalsMap[evaluation.team_id] = evaluation;
     });
+
+    // 2. Overlay with offline data (newer local changes take precedence)
+    const offlineData = offlineService.getStoredEvaluations();
+    Object.values(offlineData).forEach(offlineEval => {
+      if (offlineEval.round_id === roundId && offlineEval.judge_id === judgeId) {
+        evalsMap[offlineEval.team_id] = {
+          ...evalsMap[offlineEval.team_id],
+          ...offlineEval,
+          is_offline_copy: true // tag for UI
+        };
+      }
+    });
+
     setEvaluations(evalsMap);
   }
 
@@ -179,10 +242,44 @@ function JudgeEvaluation({ judgeId, roundId }) {
       return;
     }
 
-    setLoading(false);
+    // Offline / Online Logic
+    if (!offlineService.isOnline()) {
+      // Save locally
+      const offlineResult = offlineService.saveOfflineEvaluation(evaluation);
+      setLoading(false);
 
+      if (offlineResult.success) {
+        setMessage(submit ? 'Saved offline (will sync when online)' : 'Draft saved offline');
+        setEvaluations({
+          ...evaluations,
+          [currentTeam.id]: { ...evaluation, id: existingEval?.id, is_offline_copy: true }
+        });
+        updatePendingCount();
+
+        if (submit) {
+          advanceToNextTeam();
+        }
+      } else {
+        setMessage('Error saving offline: ' + offlineResult.error);
+      }
+      return;
+    }
+
+    // Online path
     if (result.error) {
-      setMessage(`Error: ${result.error.message}`);
+      // Fallback to offline save if network error occurs during request
+      console.warn("Network request failed, attempting offline save:", result.error);
+      const offlineFallback = offlineService.saveOfflineEvaluation(evaluation);
+      if (offlineFallback.success) {
+        setMessage('Network error. Saved offline securely. Do not close browser.');
+        updatePendingCount();
+        setEvaluations({
+          ...evaluations,
+          [currentTeam.id]: { ...evaluation, id: existingEval?.id, is_offline_copy: true }
+        });
+      } else {
+        setMessage(`Error: ${result.error.message}`);
+      }
     } else {
       setMessage(submit ? 'Evaluation submitted successfully!' : 'Draft saved');
       setEvaluations({
@@ -191,11 +288,16 @@ function JudgeEvaluation({ judgeId, roundId }) {
       });
 
       if (submit) {
-        const currentIndex = teams.findIndex(t => t.id === currentTeam.id);
-        if (currentIndex < teams.length - 1) {
-          setCurrentTeam(teams[currentIndex + 1]);
-        }
+        advanceToNextTeam();
       }
+    }
+    setLoading(false);
+  }
+
+  function advanceToNextTeam() {
+    const currentIndex = teams.findIndex(t => t.id === currentTeam.id);
+    if (currentIndex < teams.length - 1) {
+      setCurrentTeam(teams[currentIndex + 1]);
     }
   }
 
@@ -211,7 +313,11 @@ function JudgeEvaluation({ judgeId, roundId }) {
       <div className="evaluation-header">
         <div className="header-info">
           <h1>Judge Evaluation</h1>
-          <p className="round-name">{round?.name}</p>
+          <p className="round-name">
+            {round?.name}
+            {!isOnline && <span className="offline-badge"> 📡 OFFLINE MODE</span>}
+            {isOnline && pendingSync > 0 && <span className="sync-badge"> ⏳ {pendingSync} Pending Sync</span>}
+          </p>
         </div>
         <div className="progress-info">
           <div className="progress-text">

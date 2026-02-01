@@ -3,6 +3,7 @@ import { AppBar, Toolbar, Typography, Box, Button, Avatar, IconButton, Drawer, L
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { ThemeContext } from "../context/ThemeContext";
+import { Roles } from "../services/rbacService";
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import AccessibilityNewIcon from '@mui/icons-material/AccessibilityNew';
@@ -10,7 +11,7 @@ import AccessibilitySettings from "./AccessibilitySettings";
 
 function Navigation({ breadcrumb }) {
   const navigate = useNavigate();
-  const { user, logout } = useApp();
+  const { user, userProfile, logout } = useApp();
   const { highContrastMode } = useContext(ThemeContext);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showA11ySettings, setShowA11ySettings] = useState(false);
@@ -18,7 +19,11 @@ function Navigation({ breadcrumb }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
+  const userRole = userProfile?.role;
+  const isAdmin = user && [Roles.SUPER_ADMIN, Roles.CO_ADMIN, Roles.EVENT_ADMIN].includes(userRole);
+
   const navItems = [
+    ...(isAdmin ? [{ label: 'Dashboard', path: '/admin/dashboard' }] : []),
     { label: 'Events', path: '/admin/events' },
     { label: 'Users', path: '/admin/users' },
     { label: 'Showcase', path: '/showcase' },

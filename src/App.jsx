@@ -16,6 +16,7 @@ import ResultsPage from "./pages/ResultsPage.jsx";
 import EventList from "./pages/EventList.jsx";
 import ManageEvent from "./pages/ManageEvent.jsx";
 import JudgeDashboard from "./pages/JudgeDashboard.jsx";
+import AdminDashboard from "./pages/AdminDashboard.jsx";
 import AdminResults from "./pages/AdminResults.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
@@ -147,7 +148,15 @@ function AppContent() {
             path="/admin"
             element={
               <PrivateRoute role="admin">
-                <Navigate to="/admin/events" replace />
+                <AdminDashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <PrivateRoute role="admin">
+                <AdminDashboard />
               </PrivateRoute>
             }
           />

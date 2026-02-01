@@ -21,6 +21,7 @@ import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import Navigation from "../components/Navigation";
 import { eventService } from "../services/eventService";
+import { createTestScenario } from "../utils/testScenarioGenerator";
 
 function EventList() {
   const navigate = useNavigate();
@@ -141,6 +142,21 @@ function EventList() {
     navigate(`/admin/event/${eventId}`);
   };
 
+  const handleGenerateTestScenario = async () => {
+    if (window.confirm("Generate a complete test scenario (Demo Competition 2026)? This will create an event, teams, rounds, and judges.")) {
+      setLoading(true);
+      const result = await createTestScenario();
+      setLoading(false);
+
+      if (result.success) {
+        alert(result.message);
+        loadEvents();
+      } else {
+        alert("Error: " + result.error);
+      }
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return "Not set";
     return new Date(dateString).toLocaleDateString();
@@ -231,6 +247,18 @@ function EventList() {
             )}
           </Box>
         </Box>
+
+        {/* Test Scenario Trigger */}
+        {!showRecycleBin && (
+          <Box sx={{ mb: 4, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              onClick={handleGenerateTestScenario}
+              sx={{ color: '#64748b', textTransform: 'none', fontSize: '0.9rem' }}
+            >
+              🛠️ Generate Test Scenario Data
+            </Button>
+          </Box>
+        )}
 
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
