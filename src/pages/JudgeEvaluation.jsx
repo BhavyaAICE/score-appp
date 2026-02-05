@@ -372,7 +372,9 @@ function JudgeEvaluation({ judgeId, roundId }) {
                 <div>
                   <h2>{currentTeam.name}</h2>
                   {currentTeam.project_title && (
-                    <p className="project-title">{currentTeam.project_title}</p>
+                    <p className="project-title">
+                      {currentTeam.project_title}
+                    </p>
                   )}
                   {currentTeam.project_description && (
                     <p className="project-description">{currentTeam.project_description}</p>

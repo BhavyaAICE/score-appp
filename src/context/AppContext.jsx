@@ -20,7 +20,7 @@ export const AppProvider = ({ children }) => {
 
   const loadUserProfile = useCallback(async (userId) => {
     if (profileLoadedRef.current) return;
-    
+
     try {
       const profile = await rbacService.getUserProfile(userId);
       if (profile) {
@@ -105,7 +105,7 @@ export const AppProvider = ({ children }) => {
     setAuthError(null);
     setLoading(true);
     profileLoadedRef.current = false;
-    
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser({
@@ -128,7 +128,7 @@ export const AppProvider = ({ children }) => {
   const hasPermission = useCallback((resource, action) => {
     if (!userProfile) return false;
     if (userProfile.role === Roles.SUPER_ADMIN) return true;
-    
+
     return permissions.some(
       p => p.resource === resource && p.action === action && p.allowed
     );
@@ -158,7 +158,7 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     let isMounted = true;
-    
+
     // Set up loading timeout - only as a fallback for stuck states
     loadingTimeoutRef.current = setTimeout(() => {
       if (isMounted && loading) {
@@ -171,7 +171,7 @@ export const AppProvider = ({ children }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
-      
+
       if (session?.user) {
         setUser({
           id: session.user.id,
@@ -200,7 +200,7 @@ export const AppProvider = ({ children }) => {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isMounted) return;
-      
+
       if (session?.user) {
         setUser({
           id: session.user.id,
@@ -227,14 +227,51 @@ export const AppProvider = ({ children }) => {
       }
     });
 
+    // Idle Timeout Logic
+    const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+    let idleTimer;
+
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      if (user) {
+        idleTimer = setTimeout(async () => {
+          console.log("User inactive, logging out...");
+          await logout();
+          window.location.href = '/login?reason=idle';
+        }, IDLE_TIMEOUT_MS);
+      }
+    };
+
+    const handleUserActivity = () => {
+      resetIdleTimer();
+    };
+
+    if (user) {
+      // Attach listeners
+      window.addEventListener('mousemove', handleUserActivity);
+      window.addEventListener('keypress', handleUserActivity);
+      window.addEventListener('click', handleUserActivity);
+      window.addEventListener('scroll', handleUserActivity);
+
+      // Start timer
+      resetIdleTimer();
+    }
+
     return () => {
       isMounted = false;
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
       }
+      if (idleTimer) clearTimeout(idleTimer);
       subscription.unsubscribe();
+
+      // Remove listeners
+      window.removeEventListener('mousemove', handleUserActivity);
+      window.removeEventListener('keypress', handleUserActivity);
+      window.removeEventListener('click', handleUserActivity);
+      window.removeEventListener('scroll', handleUserActivity);
     };
-  }, [loadUserProfile, finishLoading]);
+  }, [loadUserProfile, finishLoading, user]); // Added user dependency to re-bind listeners on login/logout
 
   const value = {
     user,

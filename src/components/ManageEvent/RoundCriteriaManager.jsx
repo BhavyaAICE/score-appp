@@ -19,14 +19,17 @@ import {
   Alert,
   Typography,
   Chip,
+  Tooltip,
 } from "@mui/material";
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   DragIndicator as DragIcon,
+  Sync as SyncIcon,
 } from "@mui/icons-material";
 import { roundService } from "../../services/roundService";
+import { eventService } from "../../services/eventService";
 
 function RoundCriteriaManager({ round, onClose }) {
   const [criteria, setCriteria] = useState([]);
@@ -134,6 +137,49 @@ function RoundCriteriaManager({ round, onClose }) {
   const totalMaxMarks = criteria.reduce((sum, c) => sum + (c.max_marks || 0), 0);
   const totalWeight = criteria.reduce((sum, c) => sum + (c.weight || 0), 0);
 
+  const handleSyncFromEvent = async () => {
+    if (criteria.length > 0) {
+      if (!window.confirm("This will append the event's default criteria to the current list. Continue?")) {
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      // 1. Fetch event criteria
+      const eventCriteria = await eventService.getCriteriaByEvent(round.event_id);
+
+      if (!eventCriteria || eventCriteria.length === 0) {
+        setError("No default criteria found for this event. Add them in the Criteria tab first.");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Add each to round
+      // We process sequentially to ensure order is preserved (though Promis.all is faster, sequential is safer for order if backend relies on insertion time)
+      let addedCount = 0;
+      for (const ec of eventCriteria) {
+        // Standardize weight/marks
+        await roundService.createRoundCriterion(round.id, {
+          name: ec.name,
+          description: ec.description,
+          max_marks: ec.max_marks || 10,
+          weight: ec.weight || 1.0,
+          display_order: criteria.length + addedCount + 1
+        });
+        addedCount++;
+      }
+
+      await loadCriteria();
+      setError(null);
+    } catch (err) {
+      console.error("Sync error:", err);
+      setError("Failed to sync criteria: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dialog open={true} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -158,7 +204,7 @@ function RoundCriteriaManager({ round, onClose }) {
           </Alert>
         )}
 
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -167,6 +213,16 @@ function RoundCriteriaManager({ round, onClose }) {
           >
             Add Criterion
           </Button>
+          <Tooltip title="Import criteria defined in the main Event Settings">
+            <Button
+              variant="outlined"
+              startIcon={<SyncIcon />}
+              onClick={handleSyncFromEvent}
+              disabled={loading || round.status === 'completed'}
+            >
+              Sync from Event Defaults
+            </Button>
+          </Tooltip>
         </Box>
 
         {loading ? (

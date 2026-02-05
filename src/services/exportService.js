@@ -202,52 +202,104 @@ export async function exportRoundCSV(roundId, options = {}) {
     if (roundError) throw roundError;
     if (!round) throw new Error('Round not found');
 
-    const { data: normResults, error: normError } = await supabase
-      .from('round_normalization_results')
-      .select(`
-        *,
-        teams (
-          id,
-          name,
-          category_id
-        ),
-        judges (
-          id,
-          name,
-          category
-        )
-      `)
-      .eq('round_id', roundId)
-      .order('rank', { ascending: true, nullsFirst: false });
-
-    if (normError) throw normError;
-
+    let results = [];
     const teamMap = {};
-    normResults?.forEach(result => {
-      if (!teamMap[result.team_id]) {
-        teamMap[result.team_id] = {
-          team_id: result.team_id,
-          team_name: result.teams?.name,
-          team_category: result.teams?.category_id,
-          rank: result.rank,
-          percentile: result.percentile,
-          aggregated_z: result.aggregated_z,
-          judge_evaluations: []
-        };
-      }
 
-      teamMap[result.team_id].judge_evaluations.push({
-        judge_id: result.judge_id,
-        judge_name: result.judges?.name,
-        judge_category: result.judges?.category,
-        raw_total: result.raw_total,
-        judge_mean: result.judge_mean,
-        judge_std: result.judge_std,
-        z_score: result.z_score
+    // Logic for RAW export (or fallback if not computed)
+    if (options.format === 'raw' || !round.is_computed) {
+      const { data: evaluations, error: evalError } = await supabase
+        .from('round_evaluations')
+        .select(`
+          *,
+          teams (
+            id,
+            name,
+            category_id
+          ),
+          judges (
+            id,
+            name,
+            category
+          )
+        `)
+        .eq('round_id', roundId);
+
+      if (evalError) throw evalError;
+
+      evaluations?.forEach(ev => {
+        if (!teamMap[ev.team_id]) {
+          teamMap[ev.team_id] = {
+            team_id: ev.team_id,
+            team_name: ev.teams?.name,
+            team_category: ev.teams?.category_id,
+            rank: null,
+            percentile: null,
+            aggregated_z: null,
+            judge_evaluations: []
+          };
+        }
+
+        teamMap[ev.team_id].judge_evaluations.push({
+          judge_id: ev.judge_id,
+          judge_name: ev.judges?.name,
+          judge_category: ev.judges?.category,
+          raw_total: ev.raw_total,
+          judge_mean: null, // Not computed
+          judge_std: null, // Not computed
+          z_score: null    // Not computed
+        });
       });
-    });
 
-    const results = Object.values(teamMap).sort((a, b) => (a.rank || 999) - (b.rank || 999));
+      results = Object.values(teamMap).sort((a, b) => (a.team_name || '').localeCompare(b.team_name || ''));
+
+    } else {
+      // Logic for NORMALIZED/BOTH (requires computation)
+      const { data: normResults, error: normError } = await supabase
+        .from('round_normalization_results')
+        .select(`
+          *,
+          teams (
+            id,
+            name,
+            category_id
+          ),
+          judges (
+            id,
+            name,
+            category
+          )
+        `)
+        .eq('round_id', roundId)
+        .order('rank', { ascending: true, nullsFirst: false });
+
+      if (normError) throw normError;
+
+      normResults?.forEach(result => {
+        if (!teamMap[result.team_id]) {
+          teamMap[result.team_id] = {
+            team_id: result.team_id,
+            team_name: result.teams?.name,
+            team_category: result.teams?.category_id,
+            rank: result.rank,
+            percentile: result.percentile,
+            aggregated_z: result.aggregated_z,
+            judge_evaluations: []
+          };
+        }
+
+        teamMap[result.team_id].judge_evaluations.push({
+          judge_id: result.judge_id,
+          judge_name: result.judges?.name,
+          judge_category: result.judges?.category,
+          raw_total: result.raw_total,
+          judge_mean: result.judge_mean,
+          judge_std: result.judge_std,
+          z_score: result.z_score
+        });
+      });
+
+      results = Object.values(teamMap).sort((a, b) => (a.rank || 999) - (b.rank || 999));
+    }
 
     let csv;
     let filename;
@@ -257,7 +309,7 @@ export async function exportRoundCSV(roundId, options = {}) {
       filename = `${round.name.replace(/\s+/g, '_')}_judge_${options.judgeId.substring(0, 8)}.csv`;
     } else {
       const includeRaw = options.format !== 'normalized';
-      const includeNormalized = options.format !== 'raw';
+      const includeNormalized = options.format !== 'raw' && round.is_computed;
 
       csv = generateCSV(results, { includeRaw, includeNormalized });
       filename = `${round.name.replace(/\s+/g, '_')}_results_${options.format || 'both'}.csv`;

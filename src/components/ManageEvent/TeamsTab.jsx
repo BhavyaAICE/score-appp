@@ -16,10 +16,6 @@ import {
   DialogActions,
   TextField,
   IconButton,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -29,7 +25,7 @@ import {
   Upload as UploadIcon,
 } from "@mui/icons-material";
 
-function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }) {
+function TeamsTab({ teams = [], venues = [], onTeamsChange = () => { }, eventId }) {
   const [openDialog, setOpenDialog] = useState(false);
   const [currentTeam, setCurrentTeam] = useState({
     name: "",
@@ -38,7 +34,7 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
     leaderEmail: "",
     categoryId: "",
   });
-  
+
   const fileInputRef = useRef(null);
   const [excelScriptLoaded, setExcelScriptLoaded] = useState(false);
 
@@ -83,8 +79,8 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
   };
 
   const handleSaveTeam = async () => {
-    if (!currentTeam.name || !currentTeam.leaderName || !currentTeam.leaderEmail || !currentTeam.categoryId) {
-      alert("Team name, leader name, leader email, and category are required");
+    if (!currentTeam.name || !currentTeam.leaderName || !currentTeam.leaderEmail) {
+      alert("Team name, leader name, and leader email are required");
       return;
     }
 
@@ -92,7 +88,7 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
       const teamData = {
         event_id: eventId,
         name: currentTeam.name,
-        category_id: currentTeam.categoryId,
+        category_id: currentTeam.categoryId || '',
         project_title: currentTeam.projectTitle || '',
         project_description: currentTeam.projectDescription || '',
         members: [{
@@ -150,9 +146,9 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
 
   const handleExportPDF = () => {
     if (!window.jspdf) {
-        alert("PDF generation library is not loaded.");
-        console.error("jsPDF library not found on window object.");
-        return;
+      alert("PDF generation library is not loaded.");
+      console.error("jsPDF library not found on window object.");
+      return;
     }
     const doc = new window.jspdf.jsPDF();
     doc.setFontSize(18);
@@ -172,7 +168,6 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
       doc.text(`Leader: ${team.leaderName} (${team.leaderEmail})`, 20, yPosition);
       yPosition += 6;
       doc.text(`Category: ${team.categoryId || "N/A"}`, 20, yPosition);
-      yPosition += 10;
       doc.setFontSize(12);
     });
     doc.save("teams.pdf");
@@ -211,128 +206,193 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
       document.body.removeChild(link);
     }
   };
-  
+
   const handleFileImport = (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
+    const file = event.target.files[0];
+    if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-          if (!window.XLSX) {
-              console.error("SheetJS library (XLSX) not found on window object.");
-              alert("Error: The Excel processing library is missing. Please contact support.");
-              return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (!window.XLSX) {
+        console.error("SheetJS library (XLSX) not found on window object.");
+        alert("Error: The Excel processing library is missing. Please contact support.");
+        return;
+      }
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = window.XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = window.XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+        if (json.length === 0) {
+          alert('The uploaded file appears to be empty.');
+          return;
+        }
+
+        const normalizeKey = (key) => {
+          return String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
+        };
+
+        const normalizedFieldMapping = {
+          // Team Name variations
+          teamname: 'name',
+          name: 'name',
+          team: 'name',
+          projectteam: 'name',
+
+          // Project Title variations
+          projecttitle: 'projectTitle',
+          project: 'projectTitle',
+          title: 'projectTitle',
+          projectname: 'projectTitle',
+          topic: 'projectTitle',
+
+          // Leader Name variations
+          leadername: 'leaderName',
+          leader: 'leaderName',
+          leadname: 'leaderName',
+          teamlead: 'leaderName',
+          teamleader: 'leaderName',
+          studentname: 'leaderName',
+          participantname: 'leaderName',
+          contactname: 'leaderName',
+          fullname: 'leaderName',
+
+          // Leader Email variations
+          leaderemail: 'leaderEmail',
+          email: 'leaderEmail',
+          leadermail: 'leaderEmail',
+          mail: 'leaderEmail',
+          teamleademail: 'leaderEmail',
+          studentemail: 'leaderEmail',
+          contactemail: 'leaderEmail',
+          emailaddress: 'leaderEmail',
+
+          // Category variations
+          category: 'categoryId',
+          cat: 'categoryId',
+          track: 'categoryId',
+          stream: 'categoryId',
+          domain: 'categoryId'
+        };
+
+        const extractRowData = (row) => {
+          const result = {
+            name: '',
+            projectTitle: '',
+            leaderName: '',
+            leaderEmail: '',
+            categoryId: '',
+          };
+
+          for (const [key, value] of Object.entries(row)) {
+            if (value === undefined || value === null || value === '') continue;
+
+            const normalizedKey = normalizeKey(key);
+            const mappedField = normalizedFieldMapping[normalizedKey];
+
+            if (mappedField && !result[mappedField]) {
+              result[mappedField] = String(value).trim();
+            }
           }
-          try {
-              const data = new Uint8Array(e.target.result);
-              const workbook = window.XLSX.read(data, { type: 'array' });
-              const sheetName = workbook.SheetNames[0];
-              const worksheet = workbook.Sheets[sheetName];
-              const json = window.XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-              const normalizeKey = (key) => {
-                  return String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
-              };
+          return result;
+        };
 
-              const normalizedFieldMapping = {
-                  teamname: 'name',
-                  name: 'name',
-                  team: 'name',
-                  projecttitle: 'projectTitle',
-                  project: 'projectTitle',
-                  title: 'projectTitle',
-                  leadername: 'leaderName',
-                  leader: 'leaderName',
-                  leadname: 'leaderName',
-                  leaderemail: 'leaderEmail',
-                  email: 'leaderEmail',
-                  leadermail: 'leaderEmail',
-                  mail: 'leaderEmail',
-                  category: 'categoryId',
-                  cat: 'categoryId'
-              };
+        const validTeams = json.map((row, index) => {
+          const teamData = extractRowData(row);
+          if (!teamData.name || !teamData.leaderName || !teamData.leaderEmail) {
+            console.warn(`Skipping row ${index + 2} - missing required fields. Found: ${JSON.stringify(teamData)}`);
+            return null;
+          }
+          return teamData;
+        }).filter(Boolean);
 
-              const extractRowData = (row) => {
-                  const result = {
-                      name: '',
-                      projectTitle: '',
-                      leaderName: '',
-                      leaderEmail: '',
-                      categoryId: ''
-                  };
+        if (validTeams.length > 0) {
+          const importTeams = async () => {
+            // Show loading state could be added here
+            try {
+              const createdTeams = [];
+              for (const teamData of validTeams) {
+                // Validate category against DB constraint
+                const allowedCategories = ['software', 'hardware', 'Software', 'Hardware'];
+                let cleanCategory = teamData.categoryId ? teamData.categoryId.trim() : null;
 
-                  for (const [key, value] of Object.entries(row)) {
-                      if (value === undefined || value === null || value === '') continue;
-
-                      const normalizedKey = normalizeKey(key);
-                      const mappedField = normalizedFieldMapping[normalizedKey];
-
-                      if (mappedField && !result[mappedField]) {
-                          result[mappedField] = String(value).trim();
-                      }
+                // If category provided but not allowed, default to null (or we could try to map case-insensitively)
+                if (cleanCategory && !allowedCategories.includes(cleanCategory)) {
+                  // Try title case map
+                  const lower = cleanCategory.toLowerCase();
+                  if (lower === 'software') cleanCategory = 'Software';
+                  else if (lower === 'hardware') cleanCategory = 'Hardware';
+                  else {
+                    console.warn(`Category '${cleanCategory}' is not allowed. Supported: Software, Hardware. Setting to null.`);
+                    cleanCategory = null;
                   }
+                } else if (cleanCategory === '') {
+                  cleanCategory = null;
+                }
 
-                  return result;
-              };
-
-              const validTeams = json.map((row, index) => {
-                  const teamData = extractRowData(row);
-
-                  if (!teamData.name || !teamData.leaderName || !teamData.leaderEmail) {
-                      console.warn(`Skipping row ${index + 2} - missing required fields`);
-                      return null;
-                  }
-
-                  return teamData;
-              }).filter(Boolean);
-
-              if (validTeams.length > 0) {
-                const importTeams = async () => {
-                  try {
-                    const createdTeams = [];
-                    for (const teamData of validTeams) {
-                      const newTeam = await eventService.createTeam({
-                        event_id: eventId,
-                        name: teamData.name,
-                        category_id: teamData.categoryId || '',
-                        project_title: teamData.projectTitle || '',
-                        project_description: '',
-                        members: [{
-                          name: teamData.leaderName,
-                          email: teamData.leaderEmail,
-                          role: 'leader'
-                        }]
-                      });
-                      createdTeams.push(newTeam);
-                    }
-
-                    const updatedTeams = await eventService.getTeamsByEvent(eventId);
-                    onTeamsChange(updatedTeams);
-                    alert(`Successfully imported ${createdTeams.length} team(s)`);
-                  } catch (error) {
-                    console.error('Error importing teams:', error);
-                    alert('Failed to import some teams. Please try again.');
-                  }
-                };
-                importTeams();
-              } else {
-                alert('No valid teams found in the file. Please ensure required columns exist: Team Name, Leader Name, and Leader Email');
+                const newTeam = await eventService.createTeam({
+                  event_id: eventId,
+                  name: teamData.name,
+                  category_id: cleanCategory,
+                  project_title: teamData.projectTitle || '',
+                  project_description: '',
+                  members: [{
+                    name: teamData.leaderName,
+                    email: teamData.leaderEmail,
+                    role: 'leader'
+                  }]
+                });
+                createdTeams.push(newTeam);
               }
-          } catch (error) {
-              console.error("Error parsing file:", error);
-              alert("Error processing the file. Please ensure it's a valid Excel or CSV file.");
-          }
-      };
-      reader.readAsArrayBuffer(file);
 
-      event.target.value = null;
+              const updatedTeams = await eventService.getTeamsByEvent(eventId);
+              onTeamsChange(updatedTeams);
+              alert(`Successfully imported ${createdTeams.length} team(s)`);
+            } catch (error) {
+              console.error('Error importing teams:', error);
+
+              // Detailed error extraction
+              let errorMessage = 'Failed to import some teams.';
+              if (error.message) {
+                errorMessage += `\n\nServer Error: ${error.message}`;
+                if (error.message.includes('violates check constraint')) {
+                  errorMessage += `\n\nHint: Check if your 'Category' column contains values other than 'Software' or 'Hardware'.`;
+                }
+              }
+              alert(errorMessage);
+            }
+          };
+          importTeams();
+        } else {
+          // Provide detailed debug info to user
+          const firstRowKeys = Object.keys(json[0]);
+          const detectedHeaders = firstRowKeys.map(k => `"${k}"`).join(', ');
+
+          alert(
+            `No valid teams found.\n\n` +
+            `Required columns: Team Name, Leader Name, Leader Email.\n` +
+            `Detected columns in your file: ${detectedHeaders}\n\n` +
+            `Please rename your columns to match the required fields or use the template.`
+          );
+        }
+      } catch (error) {
+        console.error("Error parsing file:", error);
+        alert("Error processing the file. Please ensure it's a valid Excel or CSV file.");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+
+    event.target.value = null;
   };
 
 
-  
+
   return (
     <Box>
-       <input
+      <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileImport}
@@ -364,7 +424,7 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
           disabled={!excelScriptLoaded}
           sx={{
             borderColor: '#d1d5db',
-            color: '#ffffff',
+            color: '#4b5563',
             '&:hover': { backgroundColor: '#f9fafb', borderColor: '#9ca3af' },
             borderRadius: '8px',
             textTransform: 'none',
@@ -379,7 +439,7 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
           onClick={handleExportPDF}
           sx={{
             borderColor: '#d1d5db',
-            color: '#ffffff',
+            color: '#4b5563',
             '&:hover': { backgroundColor: '#f9fafb', borderColor: '#9ca3af' },
             borderRadius: '8px',
             textTransform: 'none',
@@ -394,7 +454,7 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
           onClick={handleExportExcel}
           sx={{
             borderColor: '#d1d5db',
-            color: '#ffffff',
+            color: '#4b5563',
             '&:hover': { backgroundColor: '#f9fafb', borderColor: '#9ca3af' },
             borderRadius: '8px',
             textTransform: 'none',
@@ -507,13 +567,7 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
           <TextField fullWidth label="Project Title" value={currentTeam.projectTitle || ''} onChange={(e) => setCurrentTeam({ ...currentTeam, projectTitle: e.target.value })} margin="normal" />
           <TextField fullWidth label="Team Leader Name" value={currentTeam.leaderName} onChange={(e) => setCurrentTeam({ ...currentTeam, leaderName: e.target.value })} margin="normal" required />
           <TextField fullWidth label="Team Leader Email" type="email" value={currentTeam.leaderEmail} onChange={(e) => setCurrentTeam({ ...currentTeam, leaderEmail: e.target.value })} margin="normal" required />
-          <FormControl fullWidth margin="normal" required>
-            <InputLabel>Category</InputLabel>
-            <Select value={currentTeam.categoryId || ''} onChange={(e) => setCurrentTeam({ ...currentTeam, categoryId: e.target.value })} label="Category">
-              <MenuItem value="Software">Software</MenuItem>
-              <MenuItem value="Hardware">Hardware</MenuItem>
-            </Select>
-          </FormControl>
+          <TextField fullWidth label="Category" value={currentTeam.categoryId || ''} onChange={(e) => setCurrentTeam({ ...currentTeam, categoryId: e.target.value })} margin="normal" placeholder="e.g. Software, Hardware, FinTech" />
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 2, gap: 1 }}>
           <Button onClick={() => setOpenDialog(false)} sx={{ textTransform: "none", color: "#7c3aed", fontWeight: 600, px: 3, py: 1.2, borderRadius: "10px", background: "rgba(124, 58, 237, 0.08)", "&:hover": { background: "rgba(124, 58, 237, 0.15)" } }}>
@@ -524,7 +578,7 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => {}, eventId }
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Box >
   );
 }
 

@@ -1,104 +1,76 @@
 /**
  * Normalization Service
- * Implements z-score and robust MAD normalization for judge scoring
- *
+ * Implements per-criterion Z-score normalization
+ * 
  * Core Algorithm:
- * 1. Compute per-judge weighted total (0-100 scale)
- * 2. Standardize per-judge using z-score or MAD
- * 3. Aggregate z-scores across judges per team
- * 4. Convert to percentiles and ranks with tie-breaking
+ * 1. Calculate Mean per criterion per judge
+ * 2. Calculate StdDev per criterion per judge
+ * 3. Calculate Z-score per criterion per team: Zc = (Score - Mean) / StdDev
+ * 4. Calculate Weighted Z-score: Zw = Zc * Weight
+ * 5. Team Score per Judge = Sum(Zw) for all criteria
+ * 6. Final Team Score = Sum(Team Score per Judge) for all judges
  */
 
 export const NormalizationMethods = {
   Z_SCORE: 'Z_SCORE',
-  ROBUST_MAD: 'ROBUST_MAD'
+  ROBUST_MAD: 'ROBUST_MAD' // Kept for interface compatibility, but implementation focuses on Z-Score
 };
 
 /**
- * Compute raw weighted total for a single evaluation
- * @param {Object} evaluation - {scores: {criterionId: value}, ...}
- * @param {Array} criteria - [{id, max_marks, weight}, ...]
- * @returns {number} - raw_total (0-100 scale)
+ * Compute statistics (mean, stdDev) for each criterion for a judge
+ * @param {Array} evaluations - evaluations by a single judge
+ * @param {Array} criteria - scoring criteria
+ * @returns {Object} - { criterionId: { mean, stdDev } }
  */
-export function computeRawTotal(evaluation, criteria) {
-  if (!evaluation.scores || Object.keys(evaluation.scores).length === 0) {
-    return 0;
-  }
-
-  let totalWeight = 0;
-  let weightedSum = 0;
+function computeJudgeStatistics(evaluations, criteria) {
+  const stats = {};
 
   criteria.forEach(criterion => {
-    const score = evaluation.scores[criterion.id];
-    if (score !== undefined && score !== null) {
-      const normalizedScore = score / criterion.max_marks;
-      const weight = criterion.weight || 1.0;
-      weightedSum += normalizedScore * weight;
-      totalWeight += weight;
+    // Extract valid scores for this criterion
+    const values = evaluations
+      .map(e => e.scores[criterion.id])
+      .filter(v => v !== undefined && v !== null && typeof v === 'number');
+
+    if (values.length === 0) {
+      stats[criterion.id] = { mean: 0, stdDev: 0 };
+      return;
     }
+
+    // Step 1: Calculate Mean (μc)
+    const sum = values.reduce((acc, val) => acc + val, 0);
+    const mean = sum / values.length;
+
+    // Step 2: Calculate Standard Deviation (σc)
+    // Formula: σc = √{Σ(Xc − μc)^2 / Nj}
+    let sumSquaredDiffs = 0;
+    values.forEach(val => {
+      const diff = val - mean;
+      sumSquaredDiffs += diff * diff;
+    });
+
+    // Using population standard deviation as per formula implies division by N
+    const stdDev = values.length > 0 ? Math.sqrt(sumSquaredDiffs / values.length) : 0;
+
+    stats[criterion.id] = {
+      mean,
+      stdDev
+    };
   });
 
-  if (totalWeight === 0) return 0;
-
-  return (weightedSum / totalWeight) * 100;
-}
-
-/**
- * Compute population standard deviation
- * @param {Array<number>} values
- * @param {number} mean
- * @returns {number}
- */
-function computeStdDev(values, mean) {
-  if (values.length === 0) return 0;
-
-  const sumSquaredDiffs = values.reduce((sum, val) => {
-    const diff = val - mean;
-    return sum + (diff * diff);
-  }, 0);
-
-  return Math.sqrt(sumSquaredDiffs / values.length);
-}
-
-/**
- * Compute median of array
- * @param {Array<number>} values
- * @returns {number}
- */
-function computeMedian(values) {
-  if (values.length === 0) return 0;
-
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-
-  if (sorted.length % 2 === 0) {
-    return (sorted[mid - 1] + sorted[mid]) / 2;
-  }
-  return sorted[mid];
-}
-
-/**
- * Compute Median Absolute Deviation (MAD)
- * @param {Array<number>} values
- * @param {number} median
- * @returns {number}
- */
-function computeMAD(values, median) {
-  if (values.length === 0) return 0;
-
-  const absoluteDeviations = values.map(val => Math.abs(val - median));
-  return computeMedian(absoluteDeviations);
+  return stats;
 }
 
 /**
  * Compute z-score normalization for all evaluations
- * @param {Array} evaluations - [{judge_id, team_id, raw_total}, ...]
- * @param {string} method - Z_SCORE or ROBUST_MAD
- * @returns {Array} - [{judge_id, team_id, raw_total, judge_mean, judge_std, z_score}, ...]
+ * @param {Array} evaluations - [{judge_id, team_id, scores: {...}}, ...]
+ * @param {Array} criteria - [{id, max_marks, weight}, ...]
+ * @param {string} method - Normalization method (default Z_SCORE)
+ * @returns {Array} - Normalized results per evaluation
  */
-export function computePerJudgeNormalization(evaluations, method = NormalizationMethods.Z_SCORE) {
+export function computePerJudgeNormalization(evaluations, criteria, method = NormalizationMethods.Z_SCORE) {
   const judgeGroups = {};
 
+  // Group by judge
   evaluations.forEach(evalItem => {
     if (!judgeGroups[evalItem.judge_id]) {
       judgeGroups[evalItem.judge_id] = [];
@@ -109,82 +81,66 @@ export function computePerJudgeNormalization(evaluations, method = Normalization
   const results = [];
 
   Object.entries(judgeGroups).forEach(([judgeId, judgeEvals]) => {
-    const rawTotals = judgeEvals.map(e => e.raw_total);
+    // Calculate stats per criterion for this judge
+    const criterionStats = computeJudgeStatistics(judgeEvals, criteria);
 
-    if (rawTotals.length < 2) {
-      judgeEvals.forEach(evalItem => {
-        results.push({
-          ...evalItem,
-          judge_mean: rawTotals[0] || 0,
-          judge_std: 0,
-          z_score: 0
-        });
+    judgeEvals.forEach(evalItem => {
+      let totalWeightedZ = 0;
+      const criterionZScores = {}; // To store individual Zw for tie-breaking
+
+      criteria.forEach(criterion => {
+        const score = evalItem.scores[criterion.id];
+        const stats = criterionStats[criterion.id];
+        const weight = criterion.weight || 1.0;
+
+        let zScore = 0;
+        let weightedZ = 0;
+
+        if (score !== undefined && score !== null && typeof score === 'number' && stats.stdDev > 0) {
+          // Step 3: Calculate Z-score (Zc)
+          zScore = (score - stats.mean) / stats.stdDev;
+
+          // Step 4: Calculate Weighted Z-score (Zw)
+          weightedZ = zScore * weight;
+        }
+
+        criterionZScores[criterion.id] = weightedZ;
+        totalWeightedZ += weightedZ;
       });
-      return;
-    }
 
-    if (method === NormalizationMethods.ROBUST_MAD) {
-      const median = computeMedian(rawTotals);
-      const mad = computeMAD(rawTotals, median);
-
-      if (mad === 0) {
-        judgeEvals.forEach(evalItem => {
-          results.push({
-            ...evalItem,
-            judge_mean: median,
-            judge_std: 0,
-            z_score: 0
-          });
-        });
-      } else {
-        const madScaleFactor = 1.4826;
-        judgeEvals.forEach(evalItem => {
-          const zScore = (evalItem.raw_total - median) / (madScaleFactor * mad);
-          results.push({
-            ...evalItem,
-            judge_mean: median,
-            judge_std: mad * madScaleFactor,
-            z_score: zScore
-          });
-        });
-      }
-    } else {
-      const mean = rawTotals.reduce((sum, val) => sum + val, 0) / rawTotals.length;
-      const stdDev = computeStdDev(rawTotals, mean);
-
-      if (stdDev === 0) {
-        judgeEvals.forEach(evalItem => {
-          results.push({
-            ...evalItem,
-            judge_mean: mean,
-            judge_std: 0,
-            z_score: 0
-          });
-        });
-      } else {
-        judgeEvals.forEach(evalItem => {
-          const zScore = (evalItem.raw_total - mean) / stdDev;
-          results.push({
-            ...evalItem,
-            judge_mean: mean,
-            judge_std: stdDev,
-            z_score: zScore
-          });
-        });
-      }
-    }
+      results.push({
+        ...evalItem,
+        z_score: totalWeightedZ, // This is technically sum of Zw per judge
+        raw_total: computeRawTotal(evalItem, criteria), // Kept for reference
+        criterion_stats: criterionStats,
+        criterion_z_scores: criterionZScores
+      });
+    });
   });
 
   return results;
 }
 
 /**
- * Aggregate z-scores per team across judges
- * @param {Array} normalizedResults - results from computePerJudgeNormalization
- * @param {Object} judgeWeights - {judgeId: weight} (optional)
- * @returns {Array} - [{team_id, aggregated_z, judge_count, mean_raw_total, median_scores}, ...]
+ * Helper to compute raw total (for reference/display only)
  */
-export function aggregateAcrossJudges(normalizedResults, judgeWeights = {}) {
+export function computeRawTotal(evaluation, criteria) {
+  if (!evaluation.scores) return 0;
+  let sum = 0;
+  criteria.forEach(c => {
+    const val = evaluation.scores[c.id];
+    if (typeof val === 'number') sum += val;
+  });
+  return sum;
+}
+
+/**
+ * Aggregate scores across judges (SUMMATION)
+ * @param {Array} normalizedResults 
+ * @param {Array} criteria 
+ * @returns {Array}
+ */
+export function aggregateAcrossJudges(normalizedResults, criteria) {
   const teamGroups = {};
 
   normalizedResults.forEach(result => {
@@ -197,27 +153,36 @@ export function aggregateAcrossJudges(normalizedResults, judgeWeights = {}) {
   const aggregated = [];
 
   Object.entries(teamGroups).forEach(([teamId, teamResults]) => {
-    let sumZ = 0;
-    let sumWeights = 0;
-    const rawTotals = [];
+    let finalZ = 0;
+    const aggregatedCriterionZ = {};
+
+    // Initialize aggregated criteria scores
+    criteria.forEach(c => aggregatedCriterionZ[c.id] = 0);
 
     teamResults.forEach(result => {
-      const weight = judgeWeights[result.judge_id] || 1.0;
-      sumZ += result.z_score * weight;
-      sumWeights += weight;
-      rawTotals.push(result.raw_total);
+      // Step 5: Add weighted Z-score per judge
+      finalZ += result.z_score;
+
+      // Aggregate individual criterion weighted scores for tie-breaking
+      if (result.criterion_z_scores) {
+        Object.entries(result.criterion_z_scores).forEach(([cId, score]) => {
+          if (aggregatedCriterionZ[cId] !== undefined) {
+            aggregatedCriterionZ[cId] += score;
+          }
+        });
+      }
     });
 
-    const aggregatedZ = sumWeights > 0 ? sumZ / sumWeights : 0;
-    const meanRawTotal = rawTotals.reduce((sum, val) => sum + val, 0) / rawTotals.length;
-    const medianRawTotal = computeMedian(rawTotals);
+    // Calculate raw stats for reference
+    const rawTotals = teamResults.map(r => r.raw_total);
+    const meanRaw = rawTotals.reduce((a, b) => a + b, 0) / rawTotals.length;
 
     aggregated.push({
       team_id: teamId,
-      aggregated_z: aggregatedZ,
+      aggregated_z: finalZ,
       judge_count: teamResults.length,
-      mean_raw_total: meanRawTotal,
-      median_raw_total: medianRawTotal,
+      mean_raw_total: meanRaw,
+      aggregated_criterion_z: aggregatedCriterionZ,
       team_results: teamResults
     });
   });
@@ -226,11 +191,10 @@ export function aggregateAcrossJudges(normalizedResults, judgeWeights = {}) {
 }
 
 /**
- * Convert aggregated z-scores to percentiles
- * @param {Array} aggregatedResults - from aggregateAcrossJudges
- * @returns {Array} - [{team_id, aggregated_z, percentile, rank}, ...]
+ * Convert to percentiles and apply tie-breaking
  */
-export function convertToPercentilesAndRanks(aggregatedResults) {
+export function convertToPercentilesAndRanks(aggregatedResults, criteria) {
+  // Sort by Final Z-Score descending
   const sorted = [...aggregatedResults].sort((a, b) => b.aggregated_z - a.aggregated_z);
 
   const withPercentiles = sorted.map((result, index) => {
@@ -245,115 +209,113 @@ export function convertToPercentilesAndRanks(aggregatedResults) {
     };
   });
 
-  return applyTieBreaking(withPercentiles);
+  return applyTieBreaking(withPercentiles, criteria);
 }
 
 /**
- * Apply deterministic tie-breaking rules
- * @param {Array} results - results with percentile and initial_rank
- * @returns {Array} - results with final rank
+ * Apply Tie-Breaking Logic:
+ * 1. Weighted Z-Score (already sorted)
+ * 2. Highest Weighted Criterion Score
+ * 3. Next Highest Weighted Criterion Score...
  */
-function applyTieBreaking(results) {
-  const groups = [];
-  let currentGroup = [];
-  let lastPercentile = null;
+function applyTieBreaking(results, criteria) {
+  // precision for float comparison
+  const EPSILON = 0.0001;
 
-  results.forEach((result, index) => {
-    if (lastPercentile === null || Math.abs(result.percentile - lastPercentile) < 0.0001) {
-      currentGroup.push(result);
-    } else {
-      if (currentGroup.length > 0) {
-        groups.push(currentGroup);
+  // Sort criteria by weight descending (for tie-breaking)
+  const sortedCriteria = [...criteria].sort((a, b) => b.weight - a.weight);
+
+  const finalResults = [...results].sort((a, b) => {
+    // 1. Primary: Final Z-Score
+    if (Math.abs(a.aggregated_z - b.aggregated_z) > EPSILON) {
+      return b.aggregated_z - a.aggregated_z;
+    }
+
+    // 2. Tie-Breaker: Compare by highest weighted criteria
+    for (const criterion of sortedCriteria) {
+      const scoreA = a.aggregated_criterion_z[criterion.id] || 0;
+      const scoreB = b.aggregated_criterion_z[criterion.id] || 0;
+
+      if (Math.abs(scoreA - scoreB) > EPSILON) {
+        return scoreB - scoreA;
       }
-      currentGroup = [result];
     }
-    lastPercentile = result.percentile;
+
+    // 3. Fallback: Mean Raw Total (optional, but good for perfect ties)
+    if (Math.abs(a.mean_raw_total - b.mean_raw_total) > EPSILON) {
+      return b.mean_raw_total - a.mean_raw_total;
+    }
+
+    return 0; // True tie
   });
 
-  if (currentGroup.length > 0) {
-    groups.push(currentGroup);
-  }
-
-  const finalResults = [];
+  // Assign Ranks
   let currentRank = 1;
+  return finalResults.map((result, index) => {
+    // Check if tied with previous
+    let isTied = false;
+    if (index > 0) {
+      const prev = finalResults[index - 1];
 
-  groups.forEach(group => {
-    if (group.length === 1) {
-      finalResults.push({
-        ...group[0],
-        rank: currentRank,
-        tie_breaker_data: {}
-      });
-    } else {
-      const sorted = [...group].sort((a, b) => {
-        if (Math.abs(a.aggregated_z - b.aggregated_z) > 0.0001) {
-          return b.aggregated_z - a.aggregated_z;
+      const zScoreTied = Math.abs(result.aggregated_z - prev.aggregated_z) < EPSILON;
+
+      // Determine if all tie-breakers were also tied
+      let criteriaTied = true;
+      for (const criterion of sortedCriteria) {
+        const scoreA = result.aggregated_criterion_z[criterion.id] || 0;
+        const scoreB = prev.aggregated_criterion_z[criterion.id] || 0;
+        if (Math.abs(scoreA - scoreB) > EPSILON) {
+          criteriaTied = false;
+          break;
         }
+      }
 
-        if (Math.abs(a.mean_raw_total - b.mean_raw_total) > 0.0001) {
-          return b.mean_raw_total - a.mean_raw_total;
-        }
+      const rawTied = Math.abs(result.mean_raw_total - prev.mean_raw_total) < EPSILON;
 
-        if (Math.abs(a.median_raw_total - b.median_raw_total) > 0.0001) {
-          return b.median_raw_total - a.median_raw_total;
-        }
-
-        if (a.judge_count !== b.judge_count) {
-          return b.judge_count - a.judge_count;
-        }
-
-        return 0;
-      });
-
-      sorted.forEach((result, idx) => {
-        const isTied = idx > 0 && (
-          Math.abs(result.aggregated_z - sorted[idx - 1].aggregated_z) < 0.0001 &&
-          Math.abs(result.mean_raw_total - sorted[idx - 1].mean_raw_total) < 0.0001 &&
-          Math.abs(result.median_raw_total - sorted[idx - 1].median_raw_total) < 0.0001 &&
-          result.judge_count === sorted[idx - 1].judge_count
-        );
-
-        finalResults.push({
-          ...result,
-          rank: currentRank + idx,
-          tie_breaker_data: {
-            requires_manual_resolution: isTied,
-            aggregated_z: result.aggregated_z,
-            mean_raw_total: result.mean_raw_total,
-            median_raw_total: result.median_raw_total,
-            judge_count: result.judge_count
-          }
-        });
-      });
+      isTied = zScoreTied && criteriaTied && rawTied;
     }
 
-    currentRank += group.length;
-  });
+    if (isTied) {
+      // Keep same rank as previous
+      // Note: This implements "dense" ranking (1, 2, 2, 3) or "standard" (1, 2, 2, 4)?
+      // Usually standard competition ranking is 1, 2, 2, 4. 
+      // The previous code implied standard ranking logic but implemented linear.
+      // Let's stick to the previous loop's logic approach but cleaner:
+      // Actually simpler: if tied with previous, rank is same. 
+      // BUT `currentRank` usually increments by 1 every step, unless we manually control it.
+      // Let's use standard competition ranking logic.
+      result.rank = finalResults[index - 1].rank;
+    } else {
+      result.rank = index + 1;
+    }
 
-  return finalResults;
+    result.tie_breaker_data = {
+      aggregated_z: result.aggregated_z,
+      criteria_scores: result.aggregated_criterion_z,
+      is_tied: isTied
+    };
+
+    return result;
+  });
 }
 
 /**
  * Main computation function for a round
- * @param {Array} evaluations - [{id, round_id, judge_id, team_id, scores}, ...]
- * @param {Array} criteria - [{id, max_marks, weight}, ...]
- * @param {Object} options - {method: 'Z_SCORE'|'ROBUST_MAD', judgeWeights: {}}
- * @returns {Object} - {perJudgeResults, aggregatedResults, finalResults}
  */
 export function computeRoundNormalization(evaluations, criteria, options = {}) {
   const method = options.method || NormalizationMethods.Z_SCORE;
-  const judgeWeights = options.judgeWeights || {};
+  // judgeWeights option is currently ignored/deprecated as user specified direct summation 
+  // but if needed we could multiply `totalWeightedZ` by judge weight. 
+  // For now, assuming standard summation as per user formula Z1 = (Z1)j1 + (Z1)j2
 
-  const evaluationsWithRawTotals = evaluations.map(evaluation => ({
-    ...eval,
-    raw_total: computeRawTotal(evaluation, criteria)
-  }));
+  // 1. Per Judge Normalization
+  const perJudgeResults = computePerJudgeNormalization(evaluations, criteria, method);
 
-  const perJudgeResults = computePerJudgeNormalization(evaluationsWithRawTotals, method);
+  // 2. Aggregation (Summation)
+  const aggregatedResults = aggregateAcrossJudges(perJudgeResults, criteria);
 
-  const aggregatedResults = aggregateAcrossJudges(perJudgeResults, judgeWeights);
-
-  const finalResults = convertToPercentilesAndRanks(aggregatedResults);
+  // 3. Ranking & Tie-Breaking
+  const finalResults = convertToPercentilesAndRanks(aggregatedResults, criteria);
 
   return {
     perJudgeResults,
@@ -361,4 +323,7 @@ export function computeRoundNormalization(evaluations, criteria, options = {}) {
     finalResults
   };
 }
+
+
+
 

@@ -54,12 +54,11 @@ This ensures results reflect *relative performance*, not judge variability.
 
 | Layer | Technology |
 |-------|-------------|
-| **Frontend** | React + Tailwind CSS |
-| **Backend** | Node.js / Express *(or Django/Flask alternative)* |
-| **Database** | PostgreSQL |
-| **Auth** | JWT for Admin, Secure Token Links for Judges |
-| **Hosting** | Vercel / AWS / DigitalOcean |
-| **Optional** | WebSockets (Live dashboards) |
+| **Frontend** | React + Material UI (MUI) |
+| **Backend** | Supabase (PostgreSQL + Auth + Realtime) |
+| **Database** | PostgreSQL (Supabase) |
+| **Auth** | Supabase Auth (Email/Password + Magic Links) |
+| **Hosting** | Vercel / Netlify |
 
 ---
 
@@ -88,9 +87,32 @@ This ensures results reflect *relative performance*, not judge variability.
 
 ---
 
-## 📐 Normalization Algorithm (Simplified JS)
+## 🧠 Normalization Logic (Z-Score)
 
-```js
-z = (score - meanJudgeScore) / stdDeviationJudge
-teamZ = average(zScoresFromAllJudges)
-percentile = rank(teamZ) / (totalTeams - 1)
+The platform uses a robust **Per-Criterion Z-Score** algorithm to ensure fairness:
+
+1.  **Calculate Z-Score per Criterion**:
+    For each criterion $c$, judge $j$, and team $i$:
+    $$Z_{i,j,c} = \frac{X_{i,j,c} - \mu_{j,c}}{\sigma_{j,c}}$$
+    *(Where $X$ is the raw score, $\mu$ is the judge's mean for that criterion, and $\sigma$ is the standard deviation)*
+
+2.  **Apply Weighting**:
+    $$Z_{weighted} = Z_{i,j,c} \times Weight_c$$
+
+3.  **Aggregation**:
+    Team's final score is the **sum** of all weighted Z-scores from all judges.
+    $$FinalScore_i = \sum_{j} \sum_{c} (Z_{i,j,c} \times Weight_c)$$
+
+4.  **Ranking**:
+    Teams are ranked by their final aggregated Z-Score. Ties are broken by:
+    1. Score on highest weighted criterion.
+    2. Score on next highest weighted criterion.
+    3. Mean raw total.
+
+---
+
+## 🆕 Recent Updates
+- **Criteria Sync**: Easily copy event-level criteria to rounds.
+- **Import/Export**: Bulk import scores via CSV; export Raw and Normalized results.
+- **Smart Auth**: 30-minute idle timeout for security.
+- **Event Management**: Complete lifecycle management for events, rounds, and judges.
