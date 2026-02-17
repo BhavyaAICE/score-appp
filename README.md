@@ -23,7 +23,7 @@ This project aims to make competition scoring **transparent**, **data-driven**, 
 - Export results (CSV/PDF)  
 - View and override scores with full audit trail  
 
-### 🧑‍⚖️ Judge Interface
+### 🧑‍⚖️ Judge Interfaces
 - Simple, distraction-free scoring form  
 - Enter category scores via secure tokenized links (no login hassle)  
 - Auto-calculated totals and validation  

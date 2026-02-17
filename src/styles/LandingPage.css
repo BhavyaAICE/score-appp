@@ -76,13 +76,19 @@ body,
   z-index: 1000;
 }
 
-.nav-container {
+.nav-container,
+.nav-container-wide {
   max-width: 1400px;
   margin: 0 auto;
   padding: 16px 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.nav-container-wide {
+  max-width: 100%;
+  padding: 16px 64px;
 }
 
 .logo h2 {

@@ -92,22 +92,22 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
       const judgeAssignments = {};
       const teamAssignments = {};
       const criteriaCounts = {};
-      
+
       for (const round of rounds) {
         try {
           const judgeData = await roundService.getRoundJudgeAssignments(round.id);
           judgeAssignments[round.id] = judgeData;
-          
+
           const teamData = await roundService.getJudgeTeamAssignmentsForRound(round.id);
           teamAssignments[round.id] = teamData;
-          
+
           const criteriaData = await roundService.getRoundCriteria(round.id);
           criteriaCounts[round.id] = criteriaData.length;
         } catch (err) {
           console.error(`Error loading assignments for round ${round.id}:`, err);
         }
       }
-      
+
       setRoundJudges(judgeAssignments);
       setRoundTeamAssignments(teamAssignments);
       setRoundCriteriaCounts(criteriaCounts);
@@ -139,7 +139,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
           name: currentRound.name,
           round_number: currentRound.round_number || 1,
         });
-        const updatedRounds = rounds.map((r) => 
+        const updatedRounds = rounds.map((r) =>
           r.id === currentRound.id ? updated : r
         );
         updatedRounds.sort((a, b) => a.round_number - b.round_number);
@@ -183,7 +183,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
     setLoading(true);
     try {
       const updated = await roundService.updateRoundStatus(roundId, newStatus);
-      const updatedRounds = rounds.map((r) => 
+      const updatedRounds = rounds.map((r) =>
         r.id === roundId ? { ...r, status: newStatus } : r
       );
       onRoundsChange(updatedRounds);
@@ -208,14 +208,14 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
     setLoading(true);
     try {
       await roundService.setRoundJudges(selectedRoundForAssign.id, selectedJudges);
-      
+
       // Reload assignments
       const judgeData = await roundService.getRoundJudgeAssignments(selectedRoundForAssign.id);
       setRoundJudges(prev => ({
         ...prev,
         [selectedRoundForAssign.id]: judgeData
       }));
-      
+
       setOpenAssignDialog(false);
       setSelectedRoundForAssign(null);
     } catch (err) {
@@ -228,7 +228,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
 
   const handleAutoAssignTeams = async (roundId) => {
     const roundJudgeList = (roundJudges[roundId] || []).map(a => a.judge);
-    
+
     if (roundJudgeList.length === 0) {
       alert("Please assign judges to this round first.");
       return;
@@ -242,14 +242,14 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
     setLoading(true);
     try {
       await roundService.autoAssignJudgesToRound(roundId, roundJudgeList, teams);
-      
+
       // Reload team assignments
       const teamData = await roundService.getJudgeTeamAssignmentsForRound(roundId);
       setRoundTeamAssignments(prev => ({
         ...prev,
         [roundId]: teamData
       }));
-      
+
       alert("Teams have been auto-assigned to judges for this round!");
     } catch (err) {
       console.error("Error auto-assigning teams:", err);
@@ -261,7 +261,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
 
   const getStatusActions = (round) => {
     const status = round.status || 'draft';
-    
+
     switch (status) {
       case 'draft':
         return (
@@ -316,15 +316,15 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
       )}
 
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />} 
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
           onClick={handleAddRound}
           disabled={loading}
         >
           Create Round
         </Button>
-        
+
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Chip label={`${rounds.length} Rounds`} color="primary" />
           <Chip label={`${judges.length} Judges Available`} variant="outlined" />
@@ -344,13 +344,13 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
             const assignedJudges = roundJudges[round.id] || [];
             const teamAssignments = roundTeamAssignments[round.id] || [];
             const uniqueTeamsAssigned = new Set(teamAssignments.map(a => a.team_id)).size;
-            
+
             return (
-              <Accordion 
+              <Accordion
                 key={round.id}
                 expanded={expandedRound === round.id}
                 onChange={() => setExpandedRound(expandedRound === round.id ? null : round.id)}
-                sx={{ 
+                sx={{
                   borderRadius: '12px !important',
                   '&:before': { display: 'none' },
                   boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
@@ -364,18 +364,18 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
                     <Typography sx={{ fontWeight: 600, flex: 1 }}>
                       {round.name}
                     </Typography>
-                    <Chip 
+                    <Chip
                       label={ROUND_STATUS_LABELS[round.status] || 'Draft'}
                       color={ROUND_STATUS_COLORS[round.status] || 'default'}
                       size="small"
                     />
-                    <Chip 
+                    <Chip
                       icon={<PeopleIcon />}
                       label={`${assignedJudges.length} judges`}
                       size="small"
                       variant="outlined"
                     />
-                    <Chip 
+                    <Chip
                       icon={<AssignmentIcon />}
                       label={`${uniqueTeamsAssigned}/${teams.length} teams`}
                       size="small"
@@ -386,10 +386,10 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
                 </AccordionSummary>
                 <AccordionDetails>
                   <Divider sx={{ mb: 2 }} />
-                  
+
                   <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
                     {getStatusActions(round)}
-                    
+
                     <Button
                       size="small"
                       variant="outlined"
@@ -399,7 +399,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
                     >
                       Criteria ({roundCriteriaCounts[round.id] || 0})
                     </Button>
-                    
+
                     <Button
                       size="small"
                       variant="outlined"
@@ -409,7 +409,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
                     >
                       Assign Judges
                     </Button>
-                    
+
                     <Button
                       size="small"
                       variant="outlined"
@@ -420,7 +420,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
                     >
                       Auto-Assign Teams
                     </Button>
-                    
+
                     <Button
                       size="small"
                       variant="outlined"
@@ -431,7 +431,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
                     >
                       Judge Progress
                     </Button>
-                    
+
                     {(round.status === 'closed' || round.status === 'completed') && (
                       <>
                         <Button
@@ -444,7 +444,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
                         >
                           Results
                         </Button>
-                        
+
                         <Button
                           size="small"
                           variant="outlined"
@@ -457,7 +457,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
                         </Button>
                       </>
                     )}
-                    
+
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -474,7 +474,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
-                    
+
                     <IconButton
                       size="small"
                       onClick={() => handleDeleteRound(round.id)}
@@ -489,7 +489,7 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                     Assigned Judges ({assignedJudges.length})
                   </Typography>
-                  
+
                   {assignedJudges.length === 0 ? (
                     <Typography color="textSecondary" sx={{ mb: 2, fontSize: '0.875rem' }}>
                       No judges assigned yet. Click "Assign Judges" to add judges to this round.
@@ -532,9 +532,9 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
                                 <TableCell>{assignment.judge?.name || 'Unknown'}</TableCell>
                                 <TableCell>{assignment.team?.name || 'Unknown'}</TableCell>
                                 <TableCell>
-                                  <Chip 
-                                    label={assignment.team?.category_id || 'N/A'} 
-                                    size="small" 
+                                  <Chip
+                                    label={assignment.team?.category_id || 'N/A'}
+                                    size="small"
                                     variant="outlined"
                                   />
                                 </TableCell>
@@ -605,105 +605,127 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
           <Typography color="textSecondary" sx={{ mb: 2 }}>
             Select judges to participate in this round. Only assigned judges can submit evaluations.
           </Typography>
-          
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Select Judges</InputLabel>
-            <Select
-              multiple
-              value={selectedJudges}
-              onChange={(e) => setSelectedJudges(e.target.value)}
-              renderValue={(selected) => (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                  {selected.map((judgeId) => {
-                    const judge = judges.find(j => j.id === judgeId);
-                    return (
-                      <Chip 
-                        key={judgeId} 
-                        label={judge?.name || judgeId} 
-                        size="small"
-                      />
-                    );
-                  })}
-                </Box>
-              )}
-            >
-              {judges.map((judge) => (
-                <MenuItem key={judge.id} value={judge.id}>
-                  <Checkbox checked={selectedJudges.includes(judge.id)} />
-                  <ListItemText 
-                    primary={judge.name} 
-                    secondary={`${judge.email} • ${judge.category || 'No category'}`} 
-                  />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          
-          <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => setSelectedJudges(judges.map(j => j.id))}
-            >
-              Select All
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => setSelectedJudges([])}
-            >
-              Clear All
-            </Button>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 3, pt: 2, gap: 1 }}>
-          <Button onClick={() => setOpenAssignDialog(false)} disabled={loading}>
-            Cancel
+
+          <Select
+            multiple
+            value={selectedJudges}
+            onChange={(e) => {
+              const {
+                target: { value },
+              } = e;
+              setSelectedJudges(
+                // On autofill we get a stringified value.
+                typeof value === 'string' ? value.split(',') : value,
+              );
+            }}
+            renderValue={(selected) => (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {selected.map((judgeId) => {
+                  const judge = judges.find(j => j.id === judgeId);
+                  return (
+                    <Chip
+                      key={judgeId}
+                      label={judge?.name || judgeId}
+                      size="small"
+                    />
+                  );
+                })}
+              </Box>
+            )}
+            MenuProps={{
+              PaperProps: {
+                style: {
+                  maxHeight: 224,
+                  width: 250,
+                },
+              },
+            }}
+          >
+            {judges.map((judge) => (
+              <MenuItem key={judge.id} value={judge.id}>
+                <Checkbox checked={selectedJudges.indexOf(judge.id) > -1} />
+                <ListItemText
+                  primary={judge.name}
+                  secondary={`${judge.email} • ${judge.category || 'No category'}`}
+                />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => setSelectedJudges(judges.map(j => j.id))}
+          >
+            Select All
           </Button>
           <Button
-            onClick={handleSaveJudgeAssignments}
-            variant="contained"
-            disabled={loading}
+            size="small"
+            variant="outlined"
+            onClick={() => setSelectedJudges([])}
           >
-            {loading ? <CircularProgress size={20} color="inherit" /> : "Save Assignments"}
+            Clear All
           </Button>
-        </DialogActions>
-      </Dialog>
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ p: 3, pt: 2, gap: 1 }}>
+        <Button onClick={() => setOpenAssignDialog(false)} disabled={loading}>
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSaveJudgeAssignments}
+          variant="contained"
+          disabled={loading}
+        >
+          {loading ? <CircularProgress size={20} color="inherit" /> : "Save Assignments"}
+        </Button>
+      </DialogActions>
+    </Dialog>
 
-      {/* Criteria Manager Dialog */}
-      {criteriaRound && (
-        <RoundCriteriaManager 
-          round={criteriaRound} 
-          onClose={() => setCriteriaRound(null)} 
-        />
-      )}
+      {/* Criteria Manager Dialog */ }
+  {
+    criteriaRound && (
+      <RoundCriteriaManager
+        round={criteriaRound}
+        onClose={() => setCriteriaRound(null)}
+      />
+    )
+  }
 
-      {/* Results Panel Dialog */}
-      {resultsRound && (
-        <RoundResultsPanel 
-          round={resultsRound} 
-          onClose={() => setResultsRound(null)} 
-        />
-      )}
+  {/* Results Panel Dialog */ }
+  {
+    resultsRound && (
+      <RoundResultsPanel
+        round={resultsRound}
+        onClose={() => setResultsRound(null)}
+      />
+    )
+  }
 
-      {/* Team Selection Panel Dialog */}
-      {selectionRound && (
-        <TeamSelectionPanel 
-          round={selectionRound} 
-          rounds={rounds}
-          onClose={() => setSelectionRound(null)}
-          onRefresh={() => onRoundsChange([...rounds])}
-        />
-      )}
+  {/* Team Selection Panel Dialog */ }
+  {
+    selectionRound && (
+      <TeamSelectionPanel
+        round={selectionRound}
+        rounds={rounds}
+        onClose={() => setSelectionRound(null)}
+        onRefresh={() => onRoundsChange([...rounds])}
+      />
+    )
+  }
 
-      {/* Judge Progress Dashboard Dialog */}
-      {progressRound && (
-        <JudgeProgressDashboard 
-          round={progressRound} 
-          onClose={() => setProgressRound(null)} 
-        />
-      )}
-    </Box>
+  {/* Judge Progress Dashboard Dialog */ }
+  {
+    progressRound && (
+      <JudgeProgressDashboard
+        round={progressRound}
+        onClose={() => setProgressRound(null)}
+      />
+    )
+  }
+    </Box >
   );
 }
 

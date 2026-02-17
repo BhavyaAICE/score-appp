@@ -115,8 +115,8 @@ function Register() {
 
       // For Supabase, user might need to confirm email
       if (result.data.user && !result.data.session) {
-        setErrors({ 
-          general: "Please check your email and click the confirmation link to complete registration." 
+        setErrors({
+          general: "Please check your email and click the confirmation link to complete registration."
         });
         setLoading(false);
         return;
@@ -130,7 +130,11 @@ function Register() {
 
     } catch (error) {
       console.error(error);
-      setErrors({ general: "An error occurred. Please try again." });
+      let errorMsg = "An error occurred. Please try again.";
+      if (error.message && error.message.includes("Failed to fetch")) {
+        errorMsg = "Network error: Unable to reach the server. Please check your internet connection.";
+      }
+      setErrors({ general: errorMsg });
     } finally {
       setLoading(false);
     }

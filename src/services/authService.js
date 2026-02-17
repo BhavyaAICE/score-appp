@@ -76,6 +76,7 @@ export const authService = {
     });
 
     if (error) {
+      console.error("SignIn error:", error);
       if (profile) {
         await this.recordFailedLogin(profile.id);
       }
@@ -86,12 +87,17 @@ export const authService = {
       await this.recordSuccessfulLogin(profile.id);
     }
 
-    await rbacService.createAuditLog(
-      data.user.id,
-      'login',
-      'auth',
-      data.user.id
-    );
+    // Wrap audit log in try-catch to not block login on audit failure
+    try {
+      await rbacService.createAuditLog(
+        data.user.id,
+        'login',
+        'auth',
+        data.user.id
+      );
+    } catch (auditError) {
+      console.warn("Failed to create login audit log:", auditError);
+    }
 
     return { success: true, data };
   },

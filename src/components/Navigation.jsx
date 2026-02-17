@@ -43,7 +43,10 @@ function Navigation({ breadcrumb }) {
           <ListItem key={item.label} disablePadding>
             <ListItemButton
               sx={{ textAlign: 'center' }}
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                navigate(item.path);
+                setMobileOpen(false);
+              }}
             >
               <ListItemText primary={item.label} />
             </ListItemButton>

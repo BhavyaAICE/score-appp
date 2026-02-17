@@ -1,29 +1,4 @@
-import { useState, useRef, useEffect } from "react";
-import { eventService } from "../../services/eventService";
-import {
-  Box,
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  IconButton,
-} from "@mui/material";
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Download as DownloadIcon,
-  Upload as UploadIcon,
-} from "@mui/icons-material";
+import * as XLSX from "xlsx";
 
 function TeamsTab({ teams = [], venues = [], onTeamsChange = () => { }, eventId }) {
   const [openDialog, setOpenDialog] = useState(false);
@@ -36,36 +11,9 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => { }, eventId 
   });
 
   const fileInputRef = useRef(null);
-  const [excelScriptLoaded, setExcelScriptLoaded] = useState(false);
-
-  useEffect(() => {
-    // Dynamically load the SheetJS library for Excel parsing
-    if (window.XLSX) {
-      setExcelScriptLoaded(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-    script.async = true;
-    script.onload = () => {
-      console.log("SheetJS library loaded successfully.");
-      setExcelScriptLoaded(true);
-    };
-    script.onerror = () => {
-      console.error("Could not load the SheetJS library for Excel import.");
-      alert("Error: Could not load the library required for Excel import. Please check your internet connection.");
-    };
-
-    document.body.appendChild(script);
-
-    // Clean up by removing the script when the component unmounts
-    return () => {
-      if (script.parentNode) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []); // This effect runs only once when the component mounts
+  // excelScriptLoaded state is no longer needed but kept to minimize refactor if other parts depend on it, 
+  // though we should set it to true immediately or remove it
+  const [excelScriptLoaded, setExcelScriptLoaded] = useState(true);
 
   const handleAddTeam = () => {
     setCurrentTeam({
@@ -213,17 +161,12 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => { }, eventId 
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      if (!window.XLSX) {
-        console.error("SheetJS library (XLSX) not found on window object.");
-        alert("Error: The Excel processing library is missing. Please contact support.");
-        return;
-      }
       try {
         const data = new Uint8Array(e.target.result);
-        const workbook = window.XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const json = window.XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+        const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
         if (json.length === 0) {
           alert('The uploaded file appears to be empty.');

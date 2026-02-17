@@ -5,7 +5,7 @@ import { authService } from "../services/authService";
 
 export const AppContext = createContext();
 
-const LOADING_TIMEOUT = 10000; // 10 seconds timeout
+const LOADING_TIMEOUT = 30000; // 30 seconds timeout
 
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);

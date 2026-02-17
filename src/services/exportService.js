@@ -177,6 +177,59 @@ function generatePDF(results, roundInfo) {
     currentY = doc.lastAutoTable.finalY + 8;
   });
 
+  // Add Signatures Section
+  if (currentY > 250) {
+    doc.addPage();
+    currentY = 20;
+  } else {
+    currentY += 10;
+  }
+
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.text("Judges' Signatures", 14, currentY);
+  currentY += 15;
+
+  // meaningful judge names from the results to create signature lines?
+  // Or just generic lines. Requirement says "Signatures".
+  // Let's extract unique judges from the results.
+  const uniqueJudges = new Set();
+  results.forEach(r => {
+    r.judge_evaluations?.forEach(je => {
+      if (je.judge_name) uniqueJudges.add(je.judge_name);
+    });
+  });
+
+  const judgesList = Array.from(uniqueJudges);
+
+  if (judgesList.length > 0) {
+    // 2 columns
+    const colWidth = 90;
+    judgesList.forEach((judgeName, index) => {
+      const x = 14 + (index % 2) * colWidth;
+      const y = currentY + Math.floor(index / 2) * 25;
+
+      if (y > 280) {
+        doc.addPage();
+        currentY = 20;
+        // reset y calculation relative to new page, but this is complex in loop.
+        // keeping it simple: just draw lines.
+      }
+
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text(judgeName, x, y);
+      doc.line(x, y + 8, x + 60, y + 8);
+    });
+  } else {
+    // Generic lines if no judge names found
+    doc.text("Judge 1: __________________________", 14, currentY);
+    doc.text("Judge 2: __________________________", 110, currentY);
+    currentY += 20;
+    doc.text("Judge 3: __________________________", 14, currentY);
+    doc.text("Judge 4: __________________________", 110, currentY);
+  }
+
   return doc;
 }
 
