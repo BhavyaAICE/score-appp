@@ -606,7 +606,8 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
             Select judges to participate in this round. Only assigned judges can submit evaluations.
           </Typography>
 
-          <Select
+          <FormControl fullWidth>
+            <Select
             multiple
             value={selectedJudges}
             onChange={(e) => {
@@ -684,47 +685,39 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
       </DialogActions>
     </Dialog>
 
-      {/* Criteria Manager Dialog */ }
-  {
-    criteriaRound && (
+    {/* Criteria Manager Dialog */}
+    {criteriaRound && (
       <RoundCriteriaManager
         round={criteriaRound}
         onClose={() => setCriteriaRound(null)}
       />
-    )
-  }
+    )}
 
-  {/* Results Panel Dialog */ }
-  {
-    resultsRound && (
+    {/* Results Panel Dialog */}
+    {resultsRound && (
       <RoundResultsPanel
         round={resultsRound}
         onClose={() => setResultsRound(null)}
       />
-    )
-  }
+    )}
 
-  {/* Team Selection Panel Dialog */ }
-  {
-    selectionRound && (
+    {/* Team Selection Panel Dialog */}
+    {selectionRound && (
       <TeamSelectionPanel
         round={selectionRound}
         rounds={rounds}
         onClose={() => setSelectionRound(null)}
         onRefresh={() => onRoundsChange([...rounds])}
       />
-    )
-  }
+    )}
 
-  {/* Judge Progress Dashboard Dialog */ }
-  {
-    progressRound && (
+    {/* Judge Progress Dashboard Dialog */}
+    {progressRound && (
       <JudgeProgressDashboard
         round={progressRound}
         onClose={() => setProgressRound(null)}
       />
-    )
-  }
+    )}
     </Box >
   );
 }
