@@ -608,116 +608,116 @@ function RoundsTab({ rounds, onRoundsChange, eventId, judges = [], teams = [] })
 
           <FormControl fullWidth>
             <Select
-            multiple
-            value={selectedJudges}
-            onChange={(e) => {
-              const {
-                target: { value },
-              } = e;
-              setSelectedJudges(
-                // On autofill we get a stringified value.
-                typeof value === 'string' ? value.split(',') : value,
-              );
-            }}
-            renderValue={(selected) => (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {selected.map((judgeId) => {
-                  const judge = judges.find(j => j.id === judgeId);
-                  return (
-                    <Chip
-                      key={judgeId}
-                      label={judge?.name || judgeId}
-                      size="small"
-                    />
-                  );
-                })}
-              </Box>
-            )}
-            MenuProps={{
-              PaperProps: {
-                style: {
-                  maxHeight: 224,
-                  width: 250,
+              multiple
+              value={selectedJudges}
+              onChange={(e) => {
+                const {
+                  target: { value },
+                } = e;
+                setSelectedJudges(
+                  // On autofill we get a stringified value.
+                  typeof value === 'string' ? value.split(',') : value,
+                );
+              }}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected.map((judgeId) => {
+                    const judge = judges.find(j => j.id === judgeId);
+                    return (
+                      <Chip
+                        key={judgeId}
+                        label={judge?.name || judgeId}
+                        size="small"
+                      />
+                    );
+                  })}
+                </Box>
+              )}
+              MenuProps={{
+                PaperProps: {
+                  style: {
+                    maxHeight: 224,
+                    width: 250,
+                  },
                 },
-              },
-            }}
-          >
-            {judges.map((judge) => (
-              <MenuItem key={judge.id} value={judge.id}>
-                <Checkbox checked={selectedJudges.indexOf(judge.id) > -1} />
-                <ListItemText
-                  primary={judge.name}
-                  secondary={`${judge.email} • ${judge.category || 'No category'}`}
-                />
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+              }}
+            >
+              {judges.map((judge) => (
+                <MenuItem key={judge.id} value={judge.id}>
+                  <Checkbox checked={selectedJudges.indexOf(judge.id) > -1} />
+                  <ListItemText
+                    primary={judge.name}
+                    secondary={`${judge.email} • ${judge.category || 'No category'}`}
+                  />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-        <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => setSelectedJudges(judges.map(j => j.id))}
-          >
-            Select All
+          <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setSelectedJudges(judges.map(j => j.id))}
+            >
+              Select All
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setSelectedJudges([])}
+            >
+              Clear All
+            </Button>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 2, gap: 1 }}>
+          <Button onClick={() => setOpenAssignDialog(false)} disabled={loading}>
+            Cancel
           </Button>
           <Button
-            size="small"
-            variant="outlined"
-            onClick={() => setSelectedJudges([])}
+            onClick={handleSaveJudgeAssignments}
+            variant="contained"
+            disabled={loading}
           >
-            Clear All
+            {loading ? <CircularProgress size={20} color="inherit" /> : "Save Assignments"}
           </Button>
-        </Box>
-      </DialogContent>
-      <DialogActions sx={{ p: 3, pt: 2, gap: 1 }}>
-        <Button onClick={() => setOpenAssignDialog(false)} disabled={loading}>
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSaveJudgeAssignments}
-          variant="contained"
-          disabled={loading}
-        >
-          {loading ? <CircularProgress size={20} color="inherit" /> : "Save Assignments"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+        </DialogActions>
+      </Dialog>
 
-    {/* Criteria Manager Dialog */}
-    {criteriaRound && (
-      <RoundCriteriaManager
-        round={criteriaRound}
-        onClose={() => setCriteriaRound(null)}
-      />
-    )}
+      {/* Criteria Manager Dialog */}
+      {criteriaRound && (
+        <RoundCriteriaManager
+          round={criteriaRound}
+          onClose={() => setCriteriaRound(null)}
+        />
+      )}
 
-    {/* Results Panel Dialog */}
-    {resultsRound && (
-      <RoundResultsPanel
-        round={resultsRound}
-        onClose={() => setResultsRound(null)}
-      />
-    )}
+      {/* Results Panel Dialog */}
+      {resultsRound && (
+        <RoundResultsPanel
+          round={resultsRound}
+          onClose={() => setResultsRound(null)}
+        />
+      )}
 
-    {/* Team Selection Panel Dialog */}
-    {selectionRound && (
-      <TeamSelectionPanel
-        round={selectionRound}
-        rounds={rounds}
-        onClose={() => setSelectionRound(null)}
-        onRefresh={() => onRoundsChange([...rounds])}
-      />
-    )}
+      {/* Team Selection Panel Dialog */}
+      {selectionRound && (
+        <TeamSelectionPanel
+          round={selectionRound}
+          rounds={rounds}
+          onClose={() => setSelectionRound(null)}
+          onRefresh={() => onRoundsChange([...rounds])}
+        />
+      )}
 
-    {/* Judge Progress Dashboard Dialog */}
-    {progressRound && (
-      <JudgeProgressDashboard
-        round={progressRound}
-        onClose={() => setProgressRound(null)}
-      />
-    )}
+      {/* Judge Progress Dashboard Dialog */}
+      {progressRound && (
+        <JudgeProgressDashboard
+          round={progressRound}
+          onClose={() => setProgressRound(null)}
+        />
+      )}
     </Box >
   );
 }
