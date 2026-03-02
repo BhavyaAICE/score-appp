@@ -5,7 +5,7 @@ import { authService } from "../services/authService";
 
 export const AppContext = createContext();
 
-const LOADING_TIMEOUT = 30000; // 30 seconds timeout
+const LOADING_TIMEOUT = 30000;
 
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -69,6 +69,7 @@ export const AppProvider = ({ children }) => {
         id: userData.id,
         email: userData.email,
         username: userData.user_metadata?.name || userData.email,
+        role: userData.user_metadata?.role || 'user',
       });
       await loadUserProfile(userData.id);
     }
@@ -82,6 +83,7 @@ export const AppProvider = ({ children }) => {
       id: userData.id,
       email: userData.email,
       username: userData.user_metadata?.name || userData.email,
+      role: userData.user_metadata?.role || 'user',
     });
     await loadUserProfile(userData.id);
   };
@@ -112,6 +114,7 @@ export const AppProvider = ({ children }) => {
           id: session.user.id,
           email: session.user.email,
           username: session.user.user_metadata?.name || session.user.email,
+          role: session.user.user_metadata?.role || 'user',
         });
         loadUserProfile(session.user.id).finally(() => {
           setLoading(false);
@@ -146,20 +149,18 @@ export const AppProvider = ({ children }) => {
     }
   }, [user, loadUserProfile]);
 
-  // Helper to clear timeout and finish loading successfully
   const finishLoading = useCallback(() => {
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current);
       loadingTimeoutRef.current = null;
     }
     setLoading(false);
-    setAuthError(null); // Clear any pending error
+    setAuthError(null);
   }, []);
 
   useEffect(() => {
     let isMounted = true;
 
-    // Set up loading timeout - only as a fallback for stuck states
     loadingTimeoutRef.current = setTimeout(() => {
       if (isMounted && loading) {
         console.warn('Auth loading timeout reached');
@@ -168,7 +169,6 @@ export const AppProvider = ({ children }) => {
       }
     }, LOADING_TIMEOUT);
 
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
 
@@ -177,8 +177,8 @@ export const AppProvider = ({ children }) => {
           id: session.user.id,
           email: session.user.email,
           username: session.user.user_metadata?.name || session.user.email,
+          role: session.user.user_metadata?.role || 'user',
         });
-        // Defer Supabase calls with setTimeout to prevent deadlock
         setTimeout(() => {
           if (isMounted) {
             loadUserProfile(session.user.id).finally(() => {
@@ -197,7 +197,6 @@ export const AppProvider = ({ children }) => {
       }
     });
 
-    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isMounted) return;
 
@@ -206,8 +205,8 @@ export const AppProvider = ({ children }) => {
           id: session.user.id,
           email: session.user.email,
           username: session.user.user_metadata?.name || session.user.email,
+          role: session.user.user_metadata?.role || 'user',
         });
-        // Defer Supabase calls with setTimeout to prevent deadlock
         setTimeout(() => {
           if (isMounted) {
             loadUserProfile(session.user.id).finally(() => {
@@ -221,14 +220,11 @@ export const AppProvider = ({ children }) => {
     }).catch((error) => {
       console.error('Session check error:', error);
       if (isMounted) {
-        // Don't show error for initial load - just finish loading
-        // The user can always login manually
         finishLoading();
       }
     });
 
-    // Idle Timeout Logic
-    const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+    const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
     let idleTimer;
 
     const resetIdleTimer = () => {
@@ -247,13 +243,10 @@ export const AppProvider = ({ children }) => {
     };
 
     if (user) {
-      // Attach listeners
       window.addEventListener('mousemove', handleUserActivity);
       window.addEventListener('keypress', handleUserActivity);
       window.addEventListener('click', handleUserActivity);
       window.addEventListener('scroll', handleUserActivity);
-
-      // Start timer
       resetIdleTimer();
     }
 
@@ -265,13 +258,12 @@ export const AppProvider = ({ children }) => {
       if (idleTimer) clearTimeout(idleTimer);
       subscription.unsubscribe();
 
-      // Remove listeners
       window.removeEventListener('mousemove', handleUserActivity);
       window.removeEventListener('keypress', handleUserActivity);
       window.removeEventListener('click', handleUserActivity);
       window.removeEventListener('scroll', handleUserActivity);
     };
-  }, [loadUserProfile, finishLoading, user]); // Added user dependency to re-bind listeners on login/logout
+  }, [loadUserProfile, finishLoading, user]);
 
   const value = {
     user,

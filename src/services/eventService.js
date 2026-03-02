@@ -20,7 +20,6 @@ export const eventService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    // Client-side filtering to handle cases where deleted_at column might not exist yet
     return (data || []).filter(e => !e.deleted_at);
   },
 
@@ -48,7 +47,6 @@ export const eventService = {
   },
 
   async deleteEvent(eventId) {
-    // Soft delete
     const { error } = await supabase
       .from('events')
       .update({ deleted_at: new Date().toISOString() })
@@ -64,7 +62,6 @@ export const eventService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    // Client-side filtering
     return (data || []).filter(e => e.deleted_at);
   },
 
@@ -238,42 +235,83 @@ export const eventService = {
     if (error) throw error;
   },
 
-  // Judge Team Assignments
+  // Judge Team Assignments - with proper UUID handling
   async getJudgeAssignments(judgeId) {
-    const { data, error } = await supabase
-      .from('judge_team_assignments')
-      .select('team_id')
-      .eq('judge_id', judgeId);
+    try {
+      const { data, error } = await supabase
+        .from('judge_team_assignments')
+        .select('team_id')
+        .eq('judge_id', judgeId);
 
-    if (error) throw error;
-    return (data || []).map(a => a.team_id);
+      if (error) {
+        console.warn('Error fetching judge assignments:', error);
+        return [];
+      }
+      
+      // Safely extract team IDs as strings
+      return (data || []).map(a => {
+        const teamId = a.team_id;
+        if (teamId === null || teamId === undefined) return null;
+        if (typeof teamId === 'string') return teamId;
+        if (typeof teamId === 'object' && teamId !== null) return teamId.id || String(teamId);
+        return String(teamId);
+      }).filter(id => id !== null && id !== undefined);
+    } catch (err) {
+      console.error('Exception in getJudgeAssignments:', err);
+      return [];
+    }
   },
 
   async setJudgeAssignments(judgeId, teamIds) {
-    const { error: deleteError } = await supabase
-      .from('judge_team_assignments')
-      .delete()
-      .eq('judge_id', judgeId);
-
-    if (deleteError) {
-      console.error('Error deleting assignments:', deleteError);
-      throw deleteError;
-    }
-
-    if (teamIds && teamIds.length > 0) {
-      const assignments = teamIds.map(teamId => ({
-        judge_id: judgeId,
-        team_id: teamId
-      }));
-
-      const { error: insertError } = await supabase
+    try {
+      // First delete existing assignments
+      const { error: deleteError } = await supabase
         .from('judge_team_assignments')
-        .insert(assignments);
+        .delete()
+        .eq('judge_id', judgeId);
 
-      if (insertError) {
-        console.error('Error inserting assignments:', insertError);
-        throw insertError;
+      if (deleteError) {
+        console.warn('Error deleting assignments (may not exist):', deleteError);
       }
+
+      if (teamIds && teamIds.length > 0) {
+        // Validate and filter team IDs to ensure they're proper UUIDs
+        const validTeamIds = teamIds.filter(id => {
+          if (!id) return false;
+          if (typeof id === 'string') {
+            // Check if it's a valid UUID format
+            return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+          }
+          if (typeof id === 'object' && id !== null && id.id) {
+            return true;
+          }
+          console.warn('Invalid team ID filtered out:', id);
+          return false;
+        }).map(id => {
+          if (typeof id === 'string') return id;
+          if (typeof id === 'object' && id.id) return id.id;
+          return id;
+        });
+
+        if (validTeamIds.length > 0) {
+          const assignments = validTeamIds.map(teamId => ({
+            judge_id: judgeId,
+            team_id: teamId
+          }));
+
+          const { error: insertError } = await supabase
+            .from('judge_team_assignments')
+            .insert(assignments);
+
+          if (insertError) {
+            console.error('Error inserting assignments:', insertError);
+            throw insertError;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Exception in setJudgeAssignments:', err);
+      throw err;
     }
   },
 

@@ -20,14 +20,12 @@ import {
   LinearProgress,
   Tooltip,
 } from "@mui/material";
-import {
-  Calculate as CalculateIcon,
-  EmojiEvents as TrophyIcon,
-  TrendingUp as TrendingIcon,
-  Refresh as RefreshIcon,
-  FileDownload as ExportIcon,
-  FileUpload as ImportIcon,
-} from "@mui/icons-material";
+import CalculateIcon from '@mui/icons-material/Calculate';
+import TrophyIcon from '@mui/icons-material/EmojiEvents';
+import TrendingIcon from '@mui/icons-material/TrendingUp';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ExportIcon from '@mui/icons-material/FileDownload';
+import ImportIcon from '@mui/icons-material/FileUpload';
 import { computeRound, getRoundResults, checkRoundReadiness } from "../../services/computeRoundService";
 import { exportRoundCSV, exportRoundPDF, downloadFile, downloadPDF } from '../../services/exportService';
 import { importService } from '../../services/importService';

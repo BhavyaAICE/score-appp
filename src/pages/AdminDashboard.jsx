@@ -12,17 +12,14 @@ import {
   Paper,
   IconButton
 } from "@mui/material";
-import {
-  Event as EventIcon,
-  People as PeopleIcon,
-  Gavel as GavelIcon,
-  Add as AddIcon,
-  ArrowForward as ArrowForwardIcon,
-  Refresh as RefreshIcon
-} from "@mui/icons-material";
+import EventIcon from '@mui/icons-material/Event';
+import PeopleIcon from '@mui/icons-material/People';
+import GavelIcon from '@mui/icons-material/Gavel';
+import AddIcon from '@mui/icons-material/Add';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { supabase } from "../supabaseClient";
 import Navigation from "../components/Navigation";
-// Chart.js imports
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -34,7 +31,6 @@ import {
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 
-// Register ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -63,24 +59,20 @@ function AdminDashboard() {
   async function loadDashboardData() {
     setLoading(true);
     try {
-      // 1. Fetch Counts
       const { count: eventCount } = await supabase.from('events').select('*', { count: 'exact', head: true });
       const { count: judgeCount } = await supabase.from('judges').select('*', { count: 'exact', head: true });
       const { count: teamCount } = await supabase.from('teams').select('*', { count: 'exact', head: true });
 
-      // 2. Fetch Recent Events
       const { data: events } = await supabase
         .from('events')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(3);
 
-      // 3. Fetch Evaluation Stats for Chart (Evaluations per Round for active event)
-      // Getting the most recent active event used for chart
       const { data: activeEvent } = await supabase
         .from('events')
         .select('id, name')
-        .eq('status', 'active')
+        .eq('status', 'live_judging')
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -88,39 +80,48 @@ function AdminDashboard() {
       let chartData = null;
 
       if (activeEvent) {
-        const { data: rounds } = await supabase
-          .from('rounds')
-          .select('id, name, round_number')
-          .eq('event_id', activeEvent.id)
-          .order('round_number');
+        try {
+          const { data: rounds } = await supabase
+            .from('rounds')
+            .select('id, name, round_number')
+            .eq('event_id', activeEvent.id)
+            .order('round_number');
 
-        if (rounds && rounds.length > 0) {
-          const roundLabels = [];
-          const evalCounts = [];
+          if (rounds && rounds.length > 0) {
+            const roundLabels = [];
+            const evalCounts = [];
 
-          for (const r of rounds) {
-            const { count } = await supabase
-              .from('round_evaluations')
-              .select('*', { count: 'exact', head: true })
-              .eq('round_id', r.id)
-              .eq('is_draft', false); // Only count submitted
+            for (const r of rounds) {
+              try {
+                const { count } = await supabase
+                  .from('round_evaluations')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('round_id', r.id)
+                  .eq('is_draft', false);
 
-            roundLabels.push(r.name);
-            evalCounts.push(count || 0);
-          }
-
-          chartData = {
-            labels: roundLabels,
-            datasets: [
-              {
-                label: 'Submitted Evaluations',
-                data: evalCounts,
-                backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                borderColor: 'rgba(59, 130, 246, 1)',
-                borderWidth: 1,
+                roundLabels.push(r.name);
+                evalCounts.push(count || 0);
+              } catch (evalErr) {
+                roundLabels.push(r.name);
+                evalCounts.push(0);
               }
-            ]
-          };
+            }
+
+            chartData = {
+              labels: roundLabels,
+              datasets: [
+                {
+                  label: 'Submitted Evaluations',
+                  data: evalCounts,
+                  backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                  borderColor: 'rgba(59, 130, 246, 1)',
+                  borderWidth: 1,
+                }
+              ]
+            };
+          }
+        } catch (err) {
+          console.warn('Chart data loading error:', err);
         }
       }
 
@@ -128,7 +129,7 @@ function AdminDashboard() {
         events: eventCount || 0,
         judges: judgeCount || 0,
         teams: teamCount || 0,
-        activeRounds: 0 // Placeholder
+        activeRounds: 0
       });
       setRecentEvents(events || []);
       setChartData(chartData);
@@ -178,7 +179,6 @@ function AdminDashboard() {
   return (
     <Box sx={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
       <Navigation />
-
       <Container maxWidth="xl" sx={{ py: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
           <Box>
@@ -199,7 +199,6 @@ function AdminDashboard() {
           </Button>
         </Box>
 
-        {/* Stats Grid */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
@@ -225,7 +224,6 @@ function AdminDashboard() {
               value={stats.teams}
               icon={<PeopleIcon fontSize="large" />}
               color="#10b981"
-            // No direct team page yet, maybe add later
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -248,7 +246,6 @@ function AdminDashboard() {
         </Grid>
 
         <Grid container spacing={4}>
-          {/* Main Chart Section */}
           <Grid item xs={12} md={8}>
             <Paper sx={{ p: 3, borderRadius: '16px', height: '100%' }}>
               <Typography variant="h6" fontWeight="700" gutterBottom>
@@ -265,24 +262,20 @@ function AdminDashboard() {
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
-                      plugins: {
-                        legend: { display: false }
-                      },
-                      scales: {
-                        y: { beginAtZero: true, ticks: { precision: 0 } }
-                      }
+                      plugins: { legend: { display: false } },
+                      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
                     }}
                   />
                 </Box>
               ) : (
-                <Box sx={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                <Box sx={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', flexDirection: 'column', gap: 2 }}>
                   <Typography>No active event data to display</Typography>
+                  <Typography variant="body2">Create an event with status "live_judging" to see evaluation activity</Typography>
                 </Box>
               )}
             </Paper>
           </Grid>
 
-          {/* Recent Events / Quick Links */}
           <Grid item xs={12} md={4}>
             <Paper sx={{ p: 3, borderRadius: '16px', height: '100%' }}>
               <Typography variant="h6" fontWeight="700" gutterBottom sx={{ mb: 3 }}>
@@ -329,7 +322,6 @@ function AdminDashboard() {
             </Paper>
           </Grid>
         </Grid>
-
       </Container>
     </Box>
   );

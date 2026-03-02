@@ -22,13 +22,11 @@ import {
   StepLabel,
   StepContent,
 } from '@mui/material';
-import {
-  AssignmentInd,
-  CheckCircle,
-  HourglassEmpty,
-  Lock as LockIcon,
-  PlayArrow as PlayArrowIcon,
-} from '@mui/icons-material';
+import AssignmentInd from '@mui/icons-material/AssignmentInd';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import HourglassEmpty from '@mui/icons-material/HourglassEmpty';
+import LockIcon from '@mui/icons-material/Lock';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { eventService } from '../services/eventService';
 import { roundService } from '../services/roundService';
 

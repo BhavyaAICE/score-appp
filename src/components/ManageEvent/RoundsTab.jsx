@@ -30,21 +30,19 @@ import {
   AccordionDetails,
   Divider,
 } from "@mui/material";
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  ExpandMore as ExpandMoreIcon,
-  People as PeopleIcon,
-  PlayArrow as PlayArrowIcon,
-  Stop as StopIcon,
-  Check as CheckIcon,
-  Assignment as AssignmentIcon,
-  Settings as SettingsIcon,
-  EmojiEvents as TrophyIcon,
-  ArrowForward as ArrowForwardIcon,
-  Visibility as VisibilityIcon,
-} from "@mui/icons-material";
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import PeopleIcon from '@mui/icons-material/People';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
+import CheckIcon from '@mui/icons-material/Check';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import SettingsIcon from '@mui/icons-material/Settings';
+import TrophyIcon from '@mui/icons-material/EmojiEvents';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { eventService } from "../../services/eventService";
 import { roundService } from "../../services/roundService";
 import RoundCriteriaManager from "./RoundCriteriaManager";

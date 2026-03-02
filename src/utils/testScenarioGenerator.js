@@ -24,7 +24,7 @@ export async function createTestScenario() {
                 description: 'Automated Test Scenario Event',
                 start_date: new Date().toISOString(),
                 end_date: new Date(Date.now() + 86400000).toISOString(),
-                status: 'active',
+                status: 'live_judging',
                 created_by: user.id
             })
             .select()

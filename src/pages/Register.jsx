@@ -10,7 +10,8 @@ function Register() {
     name: "",
     email: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    registerAsAdmin: false
   });
   const [errors, setErrors] = useState({});
   const [passwordCriteria, setPasswordCriteria] = useState({
@@ -48,8 +49,11 @@ function Register() {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }));
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: "" }));
     }
@@ -100,12 +104,24 @@ function Register() {
     setLoading(true);
 
     try {
+      // Prepare user metadata including admin role if selected
+      const userData = {
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.name,
+            role: formData.registerAsAdmin ? 'admin' : 'user'
+          }
+        }
+      };
+
       const result = await signUp(formData.email, formData.password, formData.name);
 
       if (!result.success) {
         // Handle specific Supabase errors
         let errorMessage = result.error;
-        if (result.error.includes("already registered")) {
+        if (result.error && result.error.includes("already registered")) {
           errorMessage = "Email already registered";
         }
         setErrors({ general: errorMessage });
@@ -114,7 +130,7 @@ function Register() {
       }
 
       // For Supabase, user might need to confirm email
-      if (result.data.user && !result.data.session) {
+      if (result.data && result.data.user && !result.data.session) {
         setErrors({
           general: "Please check your email and click the confirmation link to complete registration."
         });
@@ -123,7 +139,7 @@ function Register() {
       }
 
       // If user is immediately available (email confirmation disabled)
-      if (result.data.user) {
+      if (result.data && result.data.user) {
         login(result.data.user);
         navigate("/admin/events");
       }
@@ -240,6 +256,22 @@ function Register() {
             {errors.confirmPassword && (
               <div className="error-message">{errors.confirmPassword}</div>
             )}
+          </div>
+
+          <div className="form-group" style={{ marginBottom: "20px" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                name="registerAsAdmin"
+                checked={formData.registerAsAdmin}
+                onChange={handleChange}
+                style={{ width: "18px", height: "18px", accentColor: "#7c3aed" }}
+              />
+              <span style={{ fontWeight: "500" }}>Register as Admin</span>
+            </label>
+            <p style={{ fontSize: "12px", color: "#64748b", marginTop: "5px", marginLeft: "28px" }}>
+              Check this if you want to create an admin account with full access to manage events and users.
+            </p>
           </div>
 
           <div className="captcha-container">

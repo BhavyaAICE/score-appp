@@ -26,12 +26,10 @@ import {
   OutlinedInput,
   Typography,
 } from "@mui/material";
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Send as SendIcon,
-} from "@mui/icons-material";
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SendIcon from '@mui/icons-material/Send';
 
 function JudgesTab({ judges, venues, categories = [], teams = [], onJudgesChange, eventId, eventName }) {
   const [openDialog, setOpenDialog] = useState(false);

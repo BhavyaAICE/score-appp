@@ -1,4 +1,30 @@
+import React, { useState, useRef } from "react";
+import { eventService } from "../../services/eventService";
 import * as XLSX from "xlsx";
+import {
+  Box,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  IconButton,
+  Chip,
+  Typography,
+} from "@mui/material";
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
+import UploadIcon from '@mui/icons-material/Upload';
 
 function TeamsTab({ teams = [], venues = [], onTeamsChange = () => { }, eventId }) {
   const [openDialog, setOpenDialog] = useState(false);

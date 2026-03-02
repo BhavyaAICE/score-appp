@@ -21,14 +21,12 @@ import {
   IconButton,
   Tooltip,
 } from "@mui/material";
-import {
-  Email as EmailIcon,
-  Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Person as PersonIcon,
-  Schedule as ScheduleIcon,
-} from "@mui/icons-material";
+import EmailIcon from '@mui/icons-material/Email';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import PersonIcon from '@mui/icons-material/Person';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import { roundService } from "../../services/roundService";
 import { supabase } from "../../supabaseClient";
 

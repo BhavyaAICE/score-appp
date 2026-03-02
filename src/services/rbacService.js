@@ -45,8 +45,17 @@ export const Actions = {
 const permissionCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
 
+const userProfileCache = new Map();
+
 export const rbacService = {
   async getUserProfile(userId) {
+    const cacheKey = `profile:${userId}`;
+    const cached = userProfileCache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data;
+    }
+
     // First get user profile
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
@@ -67,10 +76,13 @@ export const rbacService = {
       .maybeSingle();
 
     // Return profile with role from user_roles table
-    return {
+    const result = {
       ...profile,
       role: roleData?.role || Roles.VIEWER
     };
+
+    userProfileCache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
   },
 
   async createUserProfile(userId, email, fullName, role = Roles.VIEWER) {
@@ -102,7 +114,7 @@ export const rbacService = {
 
   async updateUserRole(userId, newRole, updatedBy) {
     const oldProfile = await this.getUserProfile(userId);
-    
+
     const { data, error } = await supabase
       .from('user_profiles')
       .update({ role: newRole, updated_at: new Date().toISOString() })
@@ -122,14 +134,14 @@ export const rbacService = {
     );
 
     permissionCache.delete(userId);
-    
+
     return data;
   },
 
   async hasPermission(userId, resource, action) {
     const cacheKey = `${userId}:${resource}:${action}`;
     const cached = permissionCache.get(cacheKey);
-    
+
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       return cached.allowed;
     }
@@ -147,7 +159,7 @@ export const rbacService = {
           const profile = await this.getUserProfile(userId);
           if (!profile) return false;
           if (profile.role === Roles.SUPER_ADMIN) return true;
-          
+
           const permissions = await this.getPermissionsForRole(profile.role);
           const allowed = permissions.some(
             p => p.resource === resource && p.action === action && p.allowed
@@ -341,7 +353,7 @@ export const rbacService = {
 
   async getUserEvents(userId) {
     const profile = await this.getUserProfile(userId);
-    
+
     if (!profile) return [];
 
     if (profile.role === Roles.SUPER_ADMIN) {
@@ -349,7 +361,7 @@ export const rbacService = {
         .from('events')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data || [];
     }
@@ -362,7 +374,7 @@ export const rbacService = {
           events (*)
         `)
         .eq('user_id', userId);
-      
+
       if (error) throw error;
       return (data || []).map(d => d.events).filter(Boolean);
     }
@@ -389,7 +401,7 @@ export const rbacService = {
       console.error('Audit log error:', error);
       return null;
     }
-    
+
     return data;
   },
 

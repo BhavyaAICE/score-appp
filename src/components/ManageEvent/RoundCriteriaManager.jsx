@@ -21,13 +21,11 @@ import {
   Chip,
   Tooltip,
 } from "@mui/material";
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  DragIndicator as DragIcon,
-  Sync as SyncIcon,
-} from "@mui/icons-material";
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import DragIcon from '@mui/icons-material/DragIndicator';
+import SyncIcon from '@mui/icons-material/Sync';
 import { roundService } from "../../services/roundService";
 import { eventService } from "../../services/eventService";
 

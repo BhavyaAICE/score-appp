@@ -26,12 +26,10 @@ import {
   Tabs,
   Tab,
 } from "@mui/material";
-import {
-  ArrowForward as ArrowForwardIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  AutoAwesome as AutoIcon,
-} from "@mui/icons-material";
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import AutoIcon from '@mui/icons-material/AutoAwesome';
 import { getRoundResults } from "../../services/computeRoundService";
 import { 
   selectPerJudgeTopN, 
