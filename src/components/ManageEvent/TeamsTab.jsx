@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { eventService } from "../../services/eventService";
 import * as XLSX from "xlsx";
 import {
@@ -19,7 +19,8 @@ import {
   IconButton,
   Chip,
   Typography,
-} from "@mui/material";
+} from "@mui/material"; // Added CircularProgress import
+import { CircularProgress } from "@mui/material";
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -27,6 +28,25 @@ import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 
 function TeamsTab({ teams = [], venues = [], onTeamsChange = () => { }, eventId }) {
+  const [loadingTeams, setLoadingTeams] = useState(false);
+
+  // Fetch teams when component mounts or eventId changes
+  useEffect(() => {
+    const fetchTeams = async () => {
+      setLoadingTeams(true);
+      try {
+        const fetchedTeams = await eventService.getTeamsByEvent(eventId);
+        onTeamsChange(fetchedTeams);
+      } catch (err) {
+        console.error('Error fetching teams:', err);
+      } finally {
+        setLoadingTeams(false);
+      }
+    };
+    if (eventId) {
+      fetchTeams();
+    }
+  }, [eventId]);
   const [openDialog, setOpenDialog] = useState(false);
   const [currentTeam, setCurrentTeam] = useState({
     name: "",
@@ -42,15 +62,19 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => { }, eventId 
   const [excelScriptLoaded, setExcelScriptLoaded] = useState(true);
 
   const handleAddTeam = () => {
-    setCurrentTeam({
-      name: "",
-      projectTitle: "",
-      leaderName: "",
-      leaderEmail: "",
-      categoryId: "",
-    });
-    setOpenDialog(true);
+    // Ensure latest teams are loaded before adding
+    if (!loadingTeams) {
+      setCurrentTeam({
+        name: "",
+        projectTitle: "",
+        leaderName: "",
+        leaderEmail: "",
+        categoryId: "",
+      });
+      setOpenDialog(true);
+    }
   };
+
 
   const handleSaveTeam = async () => {
     if (!currentTeam.name || !currentTeam.leaderName || !currentTeam.leaderEmail) {
@@ -81,6 +105,7 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => { }, eventId 
       const updatedTeams = await eventService.getTeamsByEvent(eventId);
       onTeamsChange(updatedTeams);
       setOpenDialog(false);
+      setLoadingTeams(false);
     } catch (error) {
       console.error('Error saving team:', error);
       alert('Failed to save team. Please try again.');
@@ -477,7 +502,11 @@ function TeamsTab({ teams = [], venues = [], onTeamsChange = () => { }, eventId 
             </TableRow>
           </TableHead>
           <TableBody>
-            {teams.length === 0 ? (
+            {loadingTeams ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : teams.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 4, color: '#64748b' }}>
                   No teams added yet. Click "Add Team" to get started.
